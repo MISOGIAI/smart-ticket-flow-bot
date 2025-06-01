@@ -1,10 +1,12 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Clock, CheckCircle, Plus, Search, Lightbulb } from 'lucide-react';
 import { UserProfile } from '@/components/auth/AuthProvider';
+import { supabase } from '@/integrations/supabase/client';
+import { ticketService } from '@/lib/ticket-service';
+import { embeddingsService } from '@/lib/embeddings-service';
 
 interface EmployeeDashboardProps {
   currentUser: UserProfile;
@@ -12,25 +14,68 @@ interface EmployeeDashboardProps {
 }
 
 const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUser, onCreateTicket }) => {
-  // Sample data for employee's tickets
-  const myTickets = [
-    {
-      id: 'TK-001',
-      title: 'Password reset request',
-      status: 'in_progress',
-      priority: 'high',
-      created: '2024-01-15T10:30:00Z',
-      assignedTo: 'Sarah Johnson'
-    },
-    {
-      id: 'TK-002',
-      title: 'Software installation request',
-      status: 'open',
-      priority: 'medium',
-      created: '2024-01-14T14:20:00Z',
-      assignedTo: 'Pending assignment'
+  const [myTickets, setMyTickets] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch user's tickets from database
+  useEffect(() => {
+    const fetchUserTickets = async () => {
+      try {
+        const { data: tickets, error } = await supabase
+          .from('tickets')
+          .select(`
+            id,
+            title,
+            description,
+            priority,
+            status,
+            ticket_number,
+            created_at,
+            assigned_to,
+            users!tickets_assigned_to_fkey(name)
+          `)
+          .eq('requester_id', currentUser.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching tickets:', error);
+        } else {
+          setMyTickets(tickets || []);
+        }
+      } catch (error) {
+        console.error('Error fetching user tickets:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (currentUser?.id) {
+      fetchUserTickets();
     }
-  ];
+  }, [currentUser]);
+
+  // Fetch all tickets for AI training when component mounts
+  useEffect(() => {
+    const fetchAllTicketsForAI = async () => {
+      try {
+        console.log('EmployeeDashboard: Initializing AI training data fetch');
+        const allTickets = await ticketService.getAllTicketsWithRelations();
+        console.log(`EmployeeDashboard: AI training data ready with ${allTickets.length} tickets`);
+        
+        // Generate embeddings for all tickets
+        console.log('EmployeeDashboard: Starting embedding generation process');
+        const embeddings = await embeddingsService.processTickets(allTickets);
+        
+        // Store embeddings in localStorage
+        embeddingsService.storeEmbeddings(embeddings);
+        console.log('EmployeeDashboard: Embedding generation and storage complete');
+      } catch (error) {
+        console.error('EmployeeDashboard: Error in AI training process:', error);
+      }
+    };
+
+    fetchAllTicketsForAI();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -126,33 +171,49 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUser, onCr
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {myTickets.map((ticket) => (
-                  <div key={ticket.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <h4 className="font-medium">{ticket.title}</h4>
-                          <Badge variant="outline" className="text-xs">
-                            {ticket.id}
+                {isLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent mx-auto mb-2"></div>
+                    <p className="text-gray-600">Loading your tickets...</p>
+                  </div>
+                ) : myTickets.length === 0 ? (
+                  <div className="text-center py-8">
+                    <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 mb-4">You haven't created any tickets yet.</p>
+                    <Button onClick={onCreateTicket} className="bg-blue-600 hover:bg-blue-700">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Ticket
+                    </Button>
+                  </div>
+                ) : (
+                  myTickets.map((ticket) => (
+                    <div key={ticket.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <h4 className="font-medium">{ticket.title}</h4>
+                            <Badge variant="outline" className="text-xs">
+                              {ticket.ticket_number}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center space-x-4 text-sm text-gray-600">
+                            <span>Created: {formatDate(ticket.created_at)}</span>
+                            <span>•</span>
+                            <span>Assigned to: {ticket.users?.name || 'Unassigned'}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col space-y-2">
+                          <Badge className={getStatusColor(ticket.status)}>
+                            {ticket.status.replace('_', ' ').toUpperCase()}
                           </Badge>
+                          <span className={`text-sm font-medium ${getPriorityColor(ticket.priority)}`}>
+                            {ticket.priority.toUpperCase()}
+                          </span>
                         </div>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600">
-                          <span>Created: {formatDate(ticket.created)}</span>
-                          <span>•</span>
-                          <span>Assigned to: {ticket.assignedTo}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col space-y-2">
-                        <Badge className={getStatusColor(ticket.status)}>
-                          {ticket.status.replace('_', ' ').toUpperCase()}
-                        </Badge>
-                        <span className={`text-sm font-medium ${getPriorityColor(ticket.priority)}`}>
-                          {ticket.priority.toUpperCase()}
-                        </span>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

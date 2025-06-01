@@ -1,18 +1,110 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Settings, Users, Database, BarChart3, Shield, TrendingUp, Plus, FileText, MessageSquare } from 'lucide-react';
 import { UserProfile } from '@/components/auth/AuthProvider';
+import { supabase } from '@/integrations/supabase/client';
+import { ticketService } from '@/lib/ticket-service';
+import { embeddingsService } from '@/lib/embeddings-service';
 
 interface SuperAdminDashboardProps {
   currentUser: UserProfile;
 }
 
 const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ currentUser }) => {
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Fetch system data
+  useEffect(() => {
+    const fetchSystemData = async () => {
+      try {
+        // Fetch departments
+        const { data: departmentsData, error: departmentsError } = await supabase
+          .from('departments')
+          .select('*');
+
+        if (departmentsError) {
+          console.error('Error fetching departments:', departmentsError);
+        } else {
+          setDepartments(departmentsData || []);
+        }
+
+        // Fetch users
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('*');
+
+        if (usersError) {
+          console.error('Error fetching users:', usersError);
+        } else {
+          setUsers(usersData || []);
+        }
+
+        // Fetch tickets
+        const { data: ticketsData, error: ticketsError } = await supabase
+          .from('tickets')
+          .select(`
+            id,
+            title,
+            description,
+            priority,
+            status,
+            ticket_number,
+            created_at,
+            updated_at,
+            requester:users!tickets_requester_id_fkey(name),
+            assigned_agent:users!tickets_assigned_to_fkey(name),
+            category:categories(name),
+            department:departments(name)
+          `)
+          .order('created_at', { ascending: false });
+
+        if (ticketsError) {
+          console.error('Error fetching tickets:', ticketsError);
+        } else {
+          setTickets(ticketsData || []);
+        }
+      } catch (error) {
+        console.error('Error fetching system data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSystemData();
+  }, []);
+
+  // Fetch all tickets for AI training when component mounts
+  useEffect(() => {
+    const fetchAllTicketsForAI = async () => {
+      try {
+        console.log('SuperAdminDashboard: Initializing AI training data fetch');
+        const allTickets = await ticketService.getAllTicketsWithRelations();
+        console.log(`SuperAdminDashboard: AI training data ready with ${allTickets.length} tickets`);
+        
+        // Generate embeddings for all tickets
+        console.log('SuperAdminDashboard: Starting embedding generation process');
+        const embeddings = await embeddingsService.processTickets(allTickets);
+        
+        // Store embeddings in localStorage
+        embeddingsService.storeEmbeddings(embeddings);
+        console.log('SuperAdminDashboard: Embedding generation and storage complete');
+      } catch (error) {
+        console.error('SuperAdminDashboard: Error in AI training process:', error);
+      }
+    };
+
+    fetchAllTicketsForAI();
+  }, []);
+
   // Sample system-wide data
   const systemMetrics = [
     { department: 'IT Support', tickets: 142, agents: 3, avgResponse: 2.3 },

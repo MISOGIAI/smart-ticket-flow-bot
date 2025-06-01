@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MessageSquare, Clock, CheckCircle, Archive, User, Lightbulb, FileText } from 'lucide-react';
 import { UserProfile } from '@/components/auth/AuthProvider';
+import { supabase } from '@/integrations/supabase/client';
+import TicketDetailModal from '@/components/TicketDetailModal';
+import { ticketService } from '@/lib/ticket-service';
+import { embeddingsService } from '@/lib/embeddings-service';
 
 interface SupportAgentDashboardProps {
   currentUser: UserProfile;
@@ -14,51 +17,106 @@ interface SupportAgentDashboardProps {
 
 const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUser }) => {
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [assignedTickets, setAssignedTickets] = useState<any[]>([]);
+  const [departmentQueue, setDepartmentQueue] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Sample data for agent's tickets
-  const assignedTickets = [
-    {
-      id: 'TK-001',
-      title: 'Password reset request',
-      requester: 'Mike Chen',
-      priority: 'high',
-      status: 'open',
-      created: '2024-01-15T10:30:00Z',
-      category: 'IT Support',
-      description: 'Unable to access email account after returning from vacation'
-    },
-    {
-      id: 'TK-002',
-      title: 'Software installation request',
-      requester: 'Lisa Wong',
-      priority: 'medium',
-      status: 'in_progress',
-      created: '2024-01-14T14:20:00Z',
-      category: 'IT Support',
-      description: 'Need Adobe Creative Suite for marketing projects'
-    }
-  ];
+  // Fetch tickets from database
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        console.log('🔍 Fetching tickets for user:', currentUser);
+        console.log('🔍 User department_id:', currentUser?.department_id);
+        
+        // Fetch tickets assigned to current user
+        const { data: assignedData, error: assignedError } = await supabase
+          .from('tickets')
+          .select(`
+            id,
+            title,
+            description,
+            priority,
+            status,
+            ticket_number,
+            created_at,
+            updated_at,
+            requester:users!tickets_requester_id_fkey(name),
+            category:categories(name),
+            department:departments(name)
+          `)
+          .eq('assigned_to', currentUser?.id)
+          .order('created_at', { ascending: false });
 
-  const departmentQueue = [
-    {
-      id: 'TK-009',
-      title: 'Network connectivity issue',
-      requester: 'John Smith',
-      priority: 'critical',
-      status: 'open',
-      created: '2024-01-15T15:45:00Z',
-      category: 'IT Support'
-    },
-    {
-      id: 'TK-010',
-      title: 'Printer not working',
-      requester: 'Sarah Johnson',
-      priority: 'low',
-      status: 'open',
-      created: '2024-01-15T11:20:00Z',
-      category: 'IT Support'
+        if (assignedError) {
+          console.error('Error fetching assigned tickets:', assignedError);
+        } else {
+          console.log('✅ Assigned tickets fetched:', assignedData);
+          setAssignedTickets(assignedData || []);
+        }
+
+        // Fetch unassigned tickets in user's department
+        if (currentUser?.department_id) {
+          const { data: queueData, error: queueError } = await supabase
+            .from('tickets')
+            .select(`
+              id,
+              title,
+              description,
+              priority,
+              status,
+              ticket_number,
+              created_at,
+              updated_at,
+              requester:users!tickets_requester_id_fkey(name),
+              category:categories!inner(name, department_id),
+              department:departments(name)
+            `)
+            .is('assigned_to', null)
+            .eq('category.department_id', currentUser.department_id)
+            .order('created_at', { ascending: false });
+
+          if (queueError) {
+            console.error('Error fetching department queue:', queueError);
+          } else {
+            console.log('✅ Department queue fetched:', queueData);
+            setDepartmentQueue(queueData || []);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching tickets:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (currentUser?.id) {
+      fetchTickets();
     }
-  ];
+  }, [currentUser]);
+
+  // Fetch all tickets for AI training when component mounts
+  useEffect(() => {
+    const fetchAllTicketsForAI = async () => {
+      try {
+        console.log('SupportAgentDashboard: Initializing AI training data fetch');
+        const allTickets = await ticketService.getAllTicketsWithRelations();
+        console.log(`SupportAgentDashboard: AI training data ready with ${allTickets.length} tickets`);
+        
+        // Generate embeddings for all tickets
+        console.log('SupportAgentDashboard: Starting embedding generation process');
+        const embeddings = await embeddingsService.processTickets(allTickets);
+        
+        // Store embeddings in localStorage
+        embeddingsService.storeEmbeddings(embeddings);
+        console.log('SupportAgentDashboard: Embedding generation and storage complete');
+      } catch (error) {
+        console.error('SupportAgentDashboard: Error in AI training process:', error);
+      }
+    };
+
+    fetchAllTicketsForAI();
+  }, []);
 
   const responseTemplates = [
     {
@@ -102,6 +160,86 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
       minute: '2-digit'
     });
   };
+
+  const handleTicketClick = (ticketId: string) => {
+    setSelectedTicket(ticketId);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedTicket(null);
+  };
+
+  const handleTicketUpdate = () => {
+    // Refresh tickets after update
+    if (currentUser?.id) {
+      const fetchTickets = async () => {
+        try {
+          // Fetch tickets assigned to current user
+          const { data: assignedData, error: assignedError } = await supabase
+            .from('tickets')
+            .select(`
+              id,
+              title,
+              description,
+              priority,
+              status,
+              ticket_number,
+              created_at,
+              updated_at,
+              requester:users!tickets_requester_id_fkey(name),
+              category:categories(name),
+              department:departments(name)
+            `)
+            .eq('assigned_to', currentUser.id)
+            .order('created_at', { ascending: false });
+
+          if (!assignedError) {
+            setAssignedTickets(assignedData || []);
+          }
+
+          // Fetch unassigned tickets in user's department
+          if (currentUser?.department_id) {
+            const { data: queueData, error: queueError } = await supabase
+              .from('tickets')
+              .select(`
+                id,
+                title,
+                description,
+                priority,
+                status,
+                ticket_number,
+                created_at,
+                updated_at,
+                requester:users!tickets_requester_id_fkey(name),
+                category:categories!inner(name, department_id),
+                department:departments(name)
+              `)
+              .is('assigned_to', null)
+              .eq('category.department_id', currentUser.department_id)
+              .order('created_at', { ascending: false });
+
+            if (!queueError) {
+              setDepartmentQueue(queueData || []);
+            }
+          }
+        } catch (error) {
+          console.error('Error refreshing tickets:', error);
+        }
+      };
+      
+      fetchTickets();
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading tickets...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -179,7 +317,7 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
                       <div
                         key={ticket.id}
                         className={`border-l-4 p-4 rounded-r-lg ${getPriorityColor(ticket.priority)} hover:shadow-md transition-shadow cursor-pointer`}
-                        onClick={() => setSelectedTicket(ticket.id)}
+                        onClick={() => handleTicketClick(ticket.id)}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -187,14 +325,14 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
                               {getStatusIcon(ticket.status)}
                               <span className="font-medium">{ticket.title}</span>
                               <Badge variant="outline" className="text-xs">
-                                {ticket.id}
+                                {ticket.ticket_number || ticket.id}
                               </Badge>
                             </div>
                             <p className="text-sm text-gray-600 mb-2">{ticket.description}</p>
                             <div className="flex items-center space-x-4 text-sm text-gray-600">
-                              <span>Requester: {ticket.requester}</span>
+                              <span>Requester: {ticket.requester?.name || 'Unknown'}</span>
                               <span>•</span>
-                              <span>{formatDate(ticket.created)}</span>
+                              <span>{formatDate(ticket.created_at)}</span>
                             </div>
                           </div>
                           <div className="flex flex-col space-y-2">
@@ -240,7 +378,8 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
                     {departmentQueue.map((ticket) => (
                       <div
                         key={ticket.id}
-                        className={`border-l-4 p-4 rounded-r-lg ${getPriorityColor(ticket.priority)} hover:shadow-md transition-shadow`}
+                        className={`border-l-4 p-4 rounded-r-lg ${getPriorityColor(ticket.priority)} hover:shadow-md transition-shadow cursor-pointer`}
+                        onClick={() => handleTicketClick(ticket.id)}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -248,13 +387,13 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
                               {getStatusIcon(ticket.status)}
                               <span className="font-medium">{ticket.title}</span>
                               <Badge variant="outline" className="text-xs">
-                                {ticket.id}
+                                {ticket.ticket_number || ticket.id}
                               </Badge>
                             </div>
                             <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
-                              <span>Requester: {ticket.requester}</span>
+                              <span>Requester: {ticket.requester?.name || 'Unknown'}</span>
                               <span>•</span>
-                              <span>{formatDate(ticket.created)}</span>
+                              <span>{formatDate(ticket.created_at)}</span>
                             </div>
                           </div>
                           <div className="flex flex-col space-y-2">
@@ -331,6 +470,15 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
           </Card>
         </div>
       </div>
+
+      {/* Ticket Detail Modal */}
+      <TicketDetailModal
+        ticketId={selectedTicket}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        currentUser={currentUser}
+        onTicketUpdate={handleTicketUpdate}
+      />
     </div>
   );
 };

@@ -273,6 +273,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           category_id: string
+          category_name: string
           created_at: string
           department_id: string
           description: string
@@ -288,6 +289,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           category_id: string
+          category_name: string
           created_at?: string
           department_id: string
           description: string
@@ -303,6 +305,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           category_id?: string
+          category_name?: string
           created_at?: string
           department_id?: string
           description?: string

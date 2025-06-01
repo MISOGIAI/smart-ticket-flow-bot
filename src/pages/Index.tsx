@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,7 +12,7 @@ import ManagerDashboard from '@/components/dashboard/ManagerDashboard';
 import SuperAdminDashboard from '@/components/dashboard/SuperAdminDashboard';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/AuthProvider';
-import AuthPage from '@/components/auth/AuthPage';
+import LandingPage from '@/components/LandingPage';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -33,7 +32,7 @@ const Index = () => {
   }
 
   if (!user || !userProfile) {
-    return <AuthPage />;
+    return <LandingPage />;
   }
 
   const handleCreateTicket = () => {
@@ -118,7 +117,7 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Header */}
       <header className="bg-slate-800 border-b border-gray-700 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-2 rounded-lg">
@@ -153,7 +152,7 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="w-full px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-2 lg:w-fit lg:grid-cols-6">
             {tabs.map((tab) => (

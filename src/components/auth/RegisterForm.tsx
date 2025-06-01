@@ -22,6 +22,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
   const { signUp } = useAuth();
   const { toast } = useToast();
 
@@ -46,27 +47,78 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
     fetchDepartments();
   }, []);
 
-  const fetchDepartments = async () => {
-    const { data, error } = await supabase
-      .from('departments')
-      .select('id, name')
-      .order('name');
+  useEffect(() => {
+    console.log('Departments loaded:', departments);
+    console.log('Selected department:', roleSpecificData.department_id);
+  }, [departments, roleSpecificData.department_id]);
 
-    if (error) {
-      console.error('Error fetching departments:', error);
-    } else {
+  const fetchDepartments = async () => {
+    setLoadingDepartments(true);
+    try {
+      console.log('Attempting to fetch departments...');
+      
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user);
+      
+      const { data, error, count } = await supabase
+        .from('departments')
+        .select('id, name', { count: 'exact' })
+        .order('name');
+
+      console.log('Query result - data:', data, 'error:', error, 'count:', count);
+      
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
+      
+      console.log('Successfully fetched departments:', data);
       setDepartments(data || []);
+    } catch (error: any) {
+      console.error('Error fetching departments:', error);
+      toast({
+        title: "Error loading departments",
+        description: `${error.message || "Failed to load departments"} - Check console for details`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingDepartments(false);
     }
   };
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate step 1
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword || !formData.role) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Password Mismatch",
         description: "Passwords do not match",
         variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      toast({
+        title: "Password Too Short",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive"
       });
       return;
     }
@@ -84,54 +136,105 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
   };
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
+    console.log('🔵 Complete Registration button clicked!');
     e.preventDefault();
     setLoading(true);
+    
+    console.log('🔍 Form data at submission:', {
+      formData,
+      roleSpecificData,
+      departments: departments.length,
+      loadingDepartments
+    });
 
-    // Validate role-specific requirements
-    if (formData.role === 'support_agent' && !roleSpecificData.department_id) {
-      toast({
-        title: "Department Required",
-        description: "Support agents must select a department",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
+    // Step 2 validation and submission
+    // Note: job_title is optional in database schema and not required for all roles
+    console.log('✅ Proceeding with registration - job_title is optional');
+
+    // Check if departments are required but failed to load
+    if ((formData.role === 'support_agent' || formData.role === 'manager')) {
+      console.log('🏢 Checking department validation for role:', formData.role);
+      if (departments.length === 0 && !loadingDepartments) {
+        // Departments failed to load, but allow registration to proceed
+        console.warn('⚠️ Departments failed to load, proceeding without department validation');
+        toast({
+          title: "Department Loading Issue",
+          description: "Departments couldn't be loaded. Registration will proceed without department assignment.",
+          variant: "default"
+        });
+      } else if (departments.length > 0 && !roleSpecificData.department_id) {
+        // Departments are available but none selected
+        console.log('❌ Validation failed: Department selection required');
+        toast({
+          title: "Missing Information",
+          description: "Please select your department",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      } else if (roleSpecificData.department_id && departments.length > 0) {
+        // Validate selected department exists
+        const selectedDept = departments.find(dept => dept.id === roleSpecificData.department_id);
+        if (!selectedDept) {
+          console.log('❌ Validation failed: Invalid department selected');
+          toast({
+            title: "Invalid Department",
+            description: "Please select a valid department",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+        console.log('✅ Selected department:', selectedDept.name, 'ID:', selectedDept.id);
+      }
+      console.log('✅ Department validation passed');
     }
 
-    if (formData.role === 'manager' && !roleSpecificData.department_id) {
-      toast({
-        title: "Department Required",
-        description: "Managers must select a department to manage",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
+    try {
+      const userData = {
+        ...formData,
+        ...roleSpecificData,
+        expertise_areas: roleSpecificData.expertise_areas ? roleSpecificData.expertise_areas.split(',').map(area => area.trim()) : []
+      };
 
-    const userData = {
-      name: formData.name,
-      role: formData.role,
-      ...roleSpecificData,
-      expertise_areas: roleSpecificData.expertise_areas ? 
-        roleSpecificData.expertise_areas.split(',').map(s => s.trim()) : [],
-    };
-
-    const { error } = await signUp(formData.email, formData.password, userData);
-
-    if (error) {
-      toast({
-        title: "Registration Failed",
-        description: error,
-        variant: "destructive",
-      });
-    } else {
+      console.log('🚀 Starting registration process with user data:', userData);
+      console.log('🔍 FormData:', formData);
+      console.log('🔍 RoleSpecificData:', roleSpecificData);
+      console.log('🔍 Department ID specifically:', userData.department_id, 'Type:', typeof userData.department_id);
+      console.log('🔍 Selected department from state:', roleSpecificData.department_id, 'Type:', typeof roleSpecificData.department_id);
+      console.log('🔍 Available departments at submission:', departments);
+      console.log('🔍 Department validation - is department_id truthy?', !!userData.department_id);
+      console.log('🔍 Department validation - is department_id empty string?', userData.department_id === '');
+      console.log('🔍 Department validation - is department_id null?', userData.department_id === null);
+      console.log('🔍 Department validation - is department_id undefined?', userData.department_id === undefined);
+      console.log('📧 Calling signUp function...');
+      
+      await signUp(userData);
+      
+      console.log('✅ Registration successful!');
       toast({
         title: "Registration Successful!",
         description: "Please check your email to verify your account.",
       });
+      
+      console.log('🎉 Calling onSuccess callback');
+      onSuccess?.();
+    } catch (error: any) {
+      console.error('❌ Registration error:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      toast({
+        title: "Registration Failed",
+        description: error.message || "An error occurred during registration",
+        variant: "destructive"
+      });
+    } finally {
+      console.log('🏁 Registration process completed, setting loading to false');
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const renderStep1 = () => (
@@ -216,23 +319,43 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
       {(formData.role === 'support_agent' || formData.role === 'manager') && (
         <div className="space-y-2">
           <Label htmlFor="department">
-            Department {formData.role === 'manager' ? '(Required)' : '(Required)'}
+            Department {departments.length === 0 && !loadingDepartments ? '(Optional - Failed to load)' : '(Required)'}
           </Label>
-          <Select 
-            value={roleSpecificData.department_id} 
-            onValueChange={(value) => setRoleSpecificData({ ...roleSpecificData, department_id: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select department" />
-            </SelectTrigger>
-            <SelectContent>
-              {departments.map((dept) => (
-                <SelectItem key={dept.id} value={dept.id}>
-                  {dept.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {departments.length === 0 && !loadingDepartments ? (
+            <div className="p-3 border rounded-md bg-yellow-50 border-yellow-200">
+              <p className="text-sm text-yellow-800">
+                Unable to load departments. You can proceed with registration and assign a department later.
+              </p>
+            </div>
+          ) : (
+            <Select 
+              value={roleSpecificData.department_id || ''} 
+              onValueChange={(value) => {
+                console.log('🔄 Department selection changed to:', value, 'Type:', typeof value);
+                console.log('🔄 Available departments:', departments);
+                const selectedDept = departments.find(d => d.id === value);
+                console.log('🔄 Selected department object:', selectedDept);
+                setRoleSpecificData({ ...roleSpecificData, department_id: value });
+                console.log('🔄 Updated roleSpecificData will be:', { ...roleSpecificData, department_id: value });
+              }}
+              disabled={loadingDepartments}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={loadingDepartments ? "Loading departments..." : "Select department"} />
+              </SelectTrigger>
+              <SelectContent>
+                {departments.map((dept) => (
+                  <SelectItem key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {/* Debug info */}
+          <div className="text-xs text-gray-500">
+            Current department_id: {roleSpecificData.department_id || 'None selected'}
+          </div>
         </div>
       )}
 
@@ -252,7 +375,12 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
         <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1">
           Back
         </Button>
-        <Button type="submit" disabled={loading} className="flex-1">
+        <Button 
+          type="submit" 
+          disabled={loading} 
+          className="flex-1"
+          onClick={() => console.log('🖱️ Complete Registration button clicked (onClick handler)')}
+        >
           {loading ? 'Creating Account...' : 'Complete Registration'}
         </Button>
       </div>

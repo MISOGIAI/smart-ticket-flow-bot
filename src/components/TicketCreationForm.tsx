@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, Upload, X, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import TicketRoutingResults from './TicketRoutingResults';
+import { ticketRoutingService } from '@/lib/ticket-routing-service';
 
 interface TicketCreationFormProps {
   currentUser: any;
@@ -30,15 +32,12 @@ const TicketCreationForm: React.FC<TicketCreationFormProps> = ({
   });
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<Array<{id: string, name: string, department_id: string}>>([]);
+  const [departments, setDepartments] = useState<Array<{id: string, name: string}>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [routingResults, setRoutingResults] = useState<any>(null);
+  const [isRoutingTicket, setIsRoutingTicket] = useState(false);
   const { toast } = useToast();
-
-  const categories = [
-    { value: 'it-support', label: 'IT Support', department: 'IT Support' },
-    { value: 'hr-query', label: 'HR Query', department: 'HR' },
-    { value: 'admin-request', label: 'Admin Request', department: 'Admin' },
-    { value: 'facilities', label: 'Facilities', department: 'Facilities' },
-    { value: 'other', label: 'Other', department: 'General' }
-  ];
 
   const priorities = [
     { value: 'low', label: 'Low', color: 'bg-green-100 text-green-800' },
@@ -47,7 +46,40 @@ const TicketCreationForm: React.FC<TicketCreationFormProps> = ({
     { value: 'critical', label: 'Critical', color: 'bg-red-100 text-red-800' }
   ];
 
-  // AI-powered suggestions based on title/description
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [categoriesResult, departmentsResult] = await Promise.all([
+          supabase.from('categories').select('id, name, department_id'),
+          supabase.from('departments').select('id, name')
+        ]);
+
+        if (categoriesResult.error) {
+          console.error('Error fetching categories:', categoriesResult.error);
+        } else {
+          setCategories(categoriesResult.data || []);
+        }
+
+        if (departmentsResult.error) {
+          console.error('Error fetching departments:', departmentsResult.error);
+        } else {
+          setDepartments(departmentsResult.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load categories and departments",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [toast]);
+
   const generateAISuggestions = (text: string) => {
     const suggestions = [];
     const lowerText = text.toLowerCase();
@@ -97,42 +129,217 @@ const TicketCreationForm: React.FC<TicketCreationFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setIsRoutingTicket(true);
+    setRoutingResults(null);
 
     try {
-      // Simulate AI routing logic
-      const selectedCategory = categories.find(cat => cat.value === formData.category);
-      const ticketId = `TK-${Date.now().toString().slice(-6)}`;
+      const selectedCategory = categories.find(cat => cat.id === formData.category);
+      if (!selectedCategory) {
+        throw new Error('Invalid category selected');
+      }
+
+      const ticketNumber = `TK-${Date.now().toString().slice(-6)}`;
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
 
-      console.log('Ticket created:', {
-        id: ticketId,
-        ...formData,
-        assignedDepartment: selectedCategory?.department,
-        createdBy: currentUser.name,
-        status: 'Open',
-        createdAt: new Date().toISOString()
-      });
+      const { data: userProfile, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .limit(1)
+        .maybeSingle();
 
+      if (userError) {
+        console.error('User profile error:', userError);
+        throw new Error('Failed to fetch user profile');
+      }
+
+      if (!userProfile) {
+        throw new Error('User profile not found');
+      }
+
+      const { data: ticket, error: ticketError } = await supabase
+        .from('tickets')
+        .insert({
+          title: formData.title,
+          description: formData.description,
+          category_id: selectedCategory.id,
+          category_name: selectedCategory.name,
+          department_id: selectedCategory.department_id,
+          priority: formData.priority,
+          requester_id: userProfile.id,
+          ticket_number: ticketNumber,
+          status: 'open'
+        })
+        .select()
+        .single();
+
+      if (ticketError) {
+        console.error('Database error:', ticketError);
+        throw new Error(`Failed to create ticket: ${ticketError.message}`);
+      }
+
+      console.log('Ticket created successfully:', ticket);
+
+      const { data: requesterData } = await supabase
+        .from('users')
+        .select('name, department_id, job_title')
+        .eq('id', userProfile.id)
+        .single();
+
+      const { data: categoryData } = await supabase
+        .from('categories')
+        .select('name')
+        .eq('id', selectedCategory.id)
+        .single();
+
+      const { data: departmentData } = await supabase
+        .from('departments')
+        .select('name')
+        .eq('id', selectedCategory.department_id)
+        .single();
+
+      const ticketWithRelations = {
+        ...ticket,
+        requester: {
+          name: requesterData?.name || '',
+          department_id: requesterData?.department_id || null,
+          job_title: requesterData?.job_title || null
+        },
+        category: {
+          name: categoryData?.name || ''
+        },
+        department: {
+          name: departmentData?.name || ''
+        },
+        assigned_agent: null
+      };
+
+      const routingResult = await ticketRoutingService.routeTicket(ticketWithRelations);
+      console.log('AI routing result:', routingResult);
+      
+      setRoutingResults(routingResult);
+      setIsSubmitting(false);
+      
       toast({
-        title: "AI Routing Complete",
-        description: `Ticket ${ticketId} assigned to ${selectedCategory?.department} department`,
+        title: "Ticket Created",
+        description: `Ticket ${ticketNumber} has been created. Please review the AI routing recommendation.`,
       });
-
-      onTicketCreated();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error creating ticket:', error);
       toast({
         title: "Error",
-        description: "Failed to create ticket. Please try again.",
+        description: error.message || "Failed to create ticket. Please try again.",
         variant: "destructive"
       });
-    } finally {
       setIsSubmitting(false);
+      setIsRoutingTicket(false);
     }
   };
 
+  const handleAcceptRouting = async (departmentId: string) => {
+    try {
+      if (!routingResults || !routingResults.ticket) {
+        throw new Error('Routing results not available');
+      }
+
+      console.log('Accepting routing recommendation for department:', departmentId);
+      
+      // Validate that we have a UUID for department_id
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(departmentId);
+      if (!isUUID) {
+        throw new Error(`Invalid department ID format: ${departmentId}`);
+      }
+      
+      // Validate priority value from AI routing
+      let priority = routingResults.ticket.priority; // Default to current ticket priority
+      
+      // Get AI-suggested priority if available
+      if (routingResults.routing_decision?.priority) {
+        const suggestedPriority = routingResults.routing_decision.priority.toLowerCase();
+        // Check if the suggested priority is valid
+        const validPriorities = ['low', 'medium', 'high', 'critical'];
+        if (validPriorities.includes(suggestedPriority)) {
+          priority = suggestedPriority;
+        } else {
+          console.warn(`Invalid priority value suggested: ${suggestedPriority}, using default: ${priority}`);
+        }
+      }
+      
+      // Update the ticket with only necessary fields - no AI info
+      const { error } = await supabase
+        .from('tickets')
+        .update({
+          department_id: departmentId,
+          assigned_to: null, // Will be assigned by the department manager later
+          priority: priority
+        })
+        .eq('id', routingResults.ticket.id);
+
+      if (error) {
+        console.error('Error updating ticket with routing decision:', error);
+        throw new Error(`Failed to update ticket: ${error.message}`);
+      }
+
+      // Get department name for the toast message
+      let departmentName = routingResults.routing_decision.assigned_department;
+      
+      // Toast success message
+      toast({
+        title: "Routing Accepted",
+        description: `Ticket has been routed to ${departmentName} department.`,
+      });
+
+      // Complete the ticket creation process
+      onTicketCreated();
+    } catch (error: any) {
+      console.error('Error accepting routing:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to route ticket. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRejectRouting = () => {
+    setRoutingResults(null);
+    setIsRoutingTicket(false);
+    toast({
+      title: "Routing Rejected",
+      description: "Please modify your ticket details and try again.",
+      variant: "destructive"
+    });
+  };
+
   const isFormValid = formData.title && formData.description && formData.category && formData.priority;
+
+  if (isRoutingTicket || routingResults) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Ticket Routing</h2>
+            <p className="text-gray-600">Our AI is analyzing your ticket to determine the best department</p>
+          </div>
+          <Button variant="outline" onClick={onCancel} disabled={isRoutingTicket && !routingResults}>
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+        </div>
+
+        <TicketRoutingResults 
+          routingResults={routingResults} 
+          onAccept={handleAcceptRouting}
+          onReject={handleRejectRouting}
+          isLoading={isRoutingTicket && !routingResults}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -148,7 +355,6 @@ const TicketCreationForm: React.FC<TicketCreationFormProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Form */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
@@ -176,11 +382,17 @@ const TicketCreationForm: React.FC<TicketCreationFormProps> = ({
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.value} value={category.value}>
-                            {category.label}
+                        {isLoading ? (
+                          <SelectItem value="loading" disabled>
+                            Loading categories...
                           </SelectItem>
-                        ))}
+                        ) : (
+                          categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -288,7 +500,6 @@ const TicketCreationForm: React.FC<TicketCreationFormProps> = ({
           </Card>
         </div>
 
-        {/* AI Suggestions Sidebar */}
         <div className="space-y-4">
           {aiSuggestions.length > 0 && (
             <Card>
@@ -323,7 +534,7 @@ const TicketCreationForm: React.FC<TicketCreationFormProps> = ({
               </div>
               <div className="flex items-start space-x-2">
                 <AlertCircle className="h-4 w-4 text-blue-500 mt-0.5" />
-                <p className="text-sm text-gray-600">Check the knowledge base first for common issues</p>
+                <p className="text-sm text-gray-600">Our AI system will analyze your ticket and suggest the best department</p>
               </div>
             </CardContent>
           </Card>

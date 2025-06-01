@@ -1,39 +1,108 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Users, MessageSquare, Clock, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
 import { UserProfile } from '@/components/auth/AuthProvider';
+import { supabase } from '@/integrations/supabase/client';
+import { ticketService } from '@/lib/ticket-service';
+import { embeddingsService } from '@/lib/embeddings-service';
 
 interface ManagerDashboardProps {
   currentUser: UserProfile;
 }
 
 const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
-  // Sample data for manager's department
-  const departmentTickets = [
-    {
-      id: 'TK-001',
-      title: 'Password reset request',
-      requester: 'Mike Chen',
-      assignedTo: 'Sarah Johnson',
-      priority: 'high',
-      status: 'in_progress',
-      created: '2024-01-15T10:30:00Z'
-    },
-    {
-      id: 'TK-002',
-      title: 'Software installation request',
-      requester: 'Lisa Wong',
-      assignedTo: 'Tom Wilson',
-      priority: 'medium',
-      status: 'open',
-      created: '2024-01-14T14:20:00Z'
-    }
-  ];
+  const [departmentTickets, setDepartmentTickets] = useState<any[]>([]);
+  const [departmentAgents, setDepartmentAgents] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Fetch department data
+  useEffect(() => {
+    const fetchDepartmentData = async () => {
+      try {
+        if (!currentUser?.department_id) return;
+
+        // Fetch tickets for the manager's department
+        const { data: ticketsData, error: ticketsError } = await supabase
+          .from('tickets')
+          .select(`
+            id,
+            title,
+            description,
+            priority,
+            status,
+            ticket_number,
+            created_at,
+            updated_at,
+            requester:users!tickets_requester_id_fkey(name),
+            assigned_agent:users!tickets_assigned_to_fkey(name),
+            category:categories(name)
+          `)
+          .eq('department_id', currentUser.department_id)
+          .order('created_at', { ascending: false });
+
+        if (ticketsError) {
+          console.error('Error fetching department tickets:', ticketsError);
+        } else {
+          setDepartmentTickets(ticketsData || []);
+        }
+
+        // Fetch agents in the manager's department
+        const { data: agentsData, error: agentsError } = await supabase
+          .from('users')
+          .select(`
+            id,
+            name,
+            email,
+            role,
+            job_title,
+            expertise_areas
+          `)
+          .eq('department_id', currentUser.department_id)
+          .eq('role', 'support_agent');
+
+        if (agentsError) {
+          console.error('Error fetching department agents:', agentsError);
+        } else {
+          setDepartmentAgents(agentsData || []);
+        }
+      } catch (error) {
+        console.error('Error fetching department data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDepartmentData();
+  }, [currentUser]);
+
+  // Fetch all tickets for AI training when component mounts
+  useEffect(() => {
+    const fetchAllTicketsForAI = async () => {
+      try {
+        console.log('ManagerDashboard: Initializing AI training data fetch');
+        const allTickets = await ticketService.getAllTicketsWithRelations();
+        console.log(`ManagerDashboard: AI training data ready with ${allTickets.length} tickets`);
+        
+        // Generate embeddings for all tickets
+        console.log('ManagerDashboard: Starting embedding generation process');
+        const embeddings = await embeddingsService.processTickets(allTickets);
+        
+        // Store embeddings in localStorage
+        embeddingsService.storeEmbeddings(embeddings);
+        console.log('ManagerDashboard: Embedding generation and storage complete');
+      } catch (error) {
+        console.error('ManagerDashboard: Error in AI training process:', error);
+      }
+    };
+
+    fetchAllTicketsForAI();
+  }, []);
 
   const teamMembers = [
     {
@@ -133,7 +202,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
               <Users className="h-5 w-5 text-purple-600" />
               <div>
                 <p className="text-sm text-gray-600">Team Members</p>
-                <p className="text-2xl font-bold">{teamMembers.length}</p>
+                <p className="text-2xl font-bold">{departmentAgents.length}</p>
                 <p className="text-xs text-blue-600">All active</p>
               </div>
             </div>
@@ -184,29 +253,29 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {teamMembers.map((member, index) => (
+                  {departmentAgents.map((agent, index) => (
                     <div key={index} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <h4 className="font-semibold">{member.name}</h4>
-                          <p className="text-sm text-gray-600">{member.role}</p>
+                          <h4 className="font-semibold">{agent.name}</h4>
+                          <p className="text-sm text-gray-600">{agent.role}</p>
                         </div>
                         <Badge variant="outline" className="bg-green-50 text-green-700">
-                          {member.status}
+                          {agent.status}
                         </Badge>
                       </div>
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
                           <p className="text-gray-600">Assigned</p>
-                          <p className="font-semibold">{member.assignedTickets}</p>
+                          <p className="font-semibold">{agent.assignedTickets}</p>
                         </div>
                         <div>
                           <p className="text-gray-600">Resolved Today</p>
-                          <p className="font-semibold">{member.resolvedToday}</p>
+                          <p className="font-semibold">{agent.resolvedToday}</p>
                         </div>
                         <div>
                           <p className="text-gray-600">Avg Response</p>
-                          <p className="font-semibold">{member.avgResponseTime}</p>
+                          <p className="font-semibold">{agent.avgResponseTime}</p>
                         </div>
                       </div>
                     </div>
@@ -264,9 +333,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
                         <div className="flex items-center space-x-4 text-sm text-gray-600">
                           <span>Requester: {ticket.requester}</span>
                           <span>•</span>
-                          <span>Assigned to: {ticket.assignedTo}</span>
+                          <span>Assigned to: {ticket.assigned_agent}</span>
                           <span>•</span>
-                          <span>{formatDate(ticket.created)}</span>
+                          <span>{formatDate(ticket.created_at)}</span>
                         </div>
                       </div>
                       <div className="flex items-center space-x-3">
