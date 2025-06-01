@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import TicketRoutingResults from './TicketRoutingResults';
 import { ticketRoutingService } from '@/lib/ticket-routing-service';
+import { DEPARTMENT_IDS, getDepartmentNameById, isValidDepartmentId } from '@/lib/constants';
 
 interface TicketCreationFormProps {
   currentUser: any;
@@ -247,6 +248,24 @@ const TicketCreationForm: React.FC<TicketCreationFormProps> = ({
       }
 
       console.log('Accepting routing recommendation for department:', departmentId);
+      
+      // Validate department ID against our hardcoded mapping
+      if (!isValidDepartmentId(departmentId)) {
+        console.warn(`⚠️ Invalid department ID: ${departmentId}. Mapping to known department...`);
+        
+        // Try to get the department ID from the name if available
+        if (routingResults.routing_decision?.assigned_department) {
+          const deptName = routingResults.routing_decision.assigned_department;
+          const knownDeptId = DEPARTMENT_IDS[deptName as keyof typeof DEPARTMENT_IDS];
+          
+          if (knownDeptId) {
+            console.log(`✅ Found valid department ID for ${deptName}: ${knownDeptId}`);
+            departmentId = knownDeptId;
+          } else {
+            console.warn(`⚠️ Could not map ${deptName} to a known department ID`);
+          }
+        }
+      }
       
       // Validate that we have a UUID for department_id
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(departmentId);

@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { TicketWithRelations } from "./ticket-service";
 import { embeddingsService, TicketEmbedding } from "./embeddings-service";
 import { supabase } from '@/integrations/supabase/client';
+import { DEPARTMENT_IDS, getDepartmentNameById, getDepartmentIdByName } from './constants';
 
 // Initialize OpenAI client with API key from environment variables
 const openai = new OpenAI({
@@ -178,31 +179,46 @@ Return ONLY the following JSON structure:
 }
 `;
 
-// Fetch departments from the database
+// Fetch departments from the database - now uses hardcoded values
 async function fetchDepartments() {
   try {
-    const { data, error } = await supabase
-      .from('departments')
-      .select('id, name');
+    console.log('🔍 Using hardcoded department IDs');
     
-    if (error) {
-      console.error('Error fetching departments:', error);
-      throw error;
-    }
-    
-    return data.map(dept => ({
-      id: dept.id,
-      name: dept.name,
-      context: departmentContexts[dept.name] || ''
+    // Create departments array from our hardcoded constants
+    const departments = Object.entries(DEPARTMENT_IDS).map(([name, id]) => ({
+      id,
+      name,
+      context: departmentContexts[name as keyof typeof departmentContexts] || ''
     }));
+    
+    console.log(`✅ Departments loaded: ${departments.length}`);
+    return departments;
   } catch (error) {
     console.error('Failed to fetch departments:', error);
-    // Fallback to default departments if database fetch fails
-    return Object.entries(departmentContexts).map(([name, context], index) => ({
-      id: String(index + 1),
+    // Fallback using the hardcoded IDs directly
+    return Object.entries(DEPARTMENT_IDS).map(([name, id]) => ({
+      id,
       name,
-      context
+      context: departmentContexts[name as keyof typeof departmentContexts] || ''
     }));
+  }
+}
+
+// Emergency fallback - fetch default department (IT Support)
+async function getDefaultDepartment() {
+  try {
+    return {
+      id: DEPARTMENT_IDS["IT Support"],
+      name: "IT Support",
+      context: departmentContexts["IT Support"] || ''
+    };
+  } catch (error) {
+    console.error('Error fetching default department:', error);
+    return {
+      id: DEPARTMENT_IDS["IT Support"] || "f0ded6f3-a62f-4564-aee7-329b09c2e86f",
+      name: "IT Support",
+      context: departmentContexts["IT Support"] || ''
+    };
   }
 }
 
@@ -397,37 +413,19 @@ async function assignTicket(
   if (validResponses.length === 0) {
     console.error("No valid department responses to make a decision");
     
-    // Fetch a default department ID (IT Support) from the database
-    try {
-      const { data } = await supabase
-        .from('departments')
-        .select('id, name')
-        .eq('name', 'IT Support')
-        .single();
-      
-      const defaultDeptId = data?.id || '0';
-      
-      return {
-        assigned_department: "IT Support",
-        department_id: defaultDeptId, // Using actual UUID from database
-        reason: "No valid department evaluations were received. Defaulting to IT Support.",
-        confidence: 30,
-        priority: normalizePriority(ticket.priority),
-        tags: ["auto-assigned", "requires-review"],
-        estimated_resolution_time: "Unknown"
-      };
-    } catch (error) {
-      console.error("Error fetching default department:", error);
-      return {
-        assigned_department: "IT Support",
-        department_id: "0",
-        reason: "No valid department evaluations were received. Defaulting to IT Support.",
-        confidence: 30,
-        priority: normalizePriority(ticket.priority),
-        tags: ["auto-assigned", "requires-review"],
-        estimated_resolution_time: "Unknown"
-      };
-    }
+    // Use hardcoded IT Support department ID
+    const defaultDeptId = DEPARTMENT_IDS["IT Support"];
+    console.log(`Using hardcoded IT Support department ID: ${defaultDeptId}`);
+    
+    return {
+      assigned_department: "IT Support",
+      department_id: defaultDeptId,
+      reason: "No valid department evaluations were received. Defaulting to IT Support.",
+      confidence: 30,
+      priority: normalizePriority(ticket.priority),
+      tags: ["auto-assigned", "requires-review"],
+      estimated_resolution_time: "Unknown"
+    };
   }
   
   try {
@@ -540,16 +538,18 @@ export async function routeTicket(ticket: TicketWithRelations): Promise<any> {
     if (departmentResults.length === 0) {
       console.warn("⚠️ No valid department evaluations, using default department (IT Support)");
       
-      // Find IT Support department or use first department as fallback
-      const itDept = departments.find(d => d.name === "IT Support") || departments[0];
+      // Find IT Support department using hardcoded ID
+      const itDeptId = DEPARTMENT_IDS["IT Support"];
+      const itDept = departments.find(d => d.id === itDeptId) || 
+                    { id: itDeptId, name: "IT Support" };
       
       if (!itDept) {
-        throw new Error("No departments found in database");
+        throw new Error("No departments found");
       }
       
       const defaultDecision = {
         assigned_department: itDept.name,
-        department_id: itDept.id, // This is a valid UUID from the database
+        department_id: itDept.id,
         reason: "No valid department evaluations were received. The ticket appears to be technical in nature, so defaulting to IT Support.",
         confidence: 40,
         priority: normalizePriority(ticket.priority),
@@ -591,10 +591,10 @@ export async function routeTicket(ticket: TicketWithRelations): Promise<any> {
       };
     }
     
-    // Create a mapping of department names to IDs for validation
+    // Create a mapping of department names to IDs using our hardcoded constants
     const deptNameToIdMap: {[key: string]: string} = {};
-    departments.forEach(dept => {
-      deptNameToIdMap[dept.name] = dept.id;
+    Object.entries(DEPARTMENT_IDS).forEach(([name, id]) => {
+      deptNameToIdMap[name] = id;
     });
     
     // Ensure routing decision has all required fields with defaults
@@ -603,8 +603,7 @@ export async function routeTicket(ticket: TicketWithRelations): Promise<any> {
       assigned_department: routingDecision.assigned_department || "IT Support",
       department_id: deptNameToIdMap[routingDecision.assigned_department] || 
                     routingDecision.department_id || 
-                    departments.find(d => d.name === "IT Support")?.id || 
-                    departments[0].id,
+                    DEPARTMENT_IDS["IT Support"],
       reason: routingDecision.reason || "No specific reason provided.",
       confidence: routingDecision.confidence || 50,
       priority: normalizePriority(routingDecision.priority || ticket.priority),
@@ -616,7 +615,7 @@ export async function routeTicket(ticket: TicketWithRelations): Promise<any> {
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validatedDecision.department_id);
     if (!isUUID) {
       console.warn(`Invalid department ID format detected: ${validatedDecision.department_id}. Using fallback ID.`);
-      validatedDecision.department_id = departments.find(d => d.name === "IT Support")?.id || departments[0].id;
+      validatedDecision.department_id = DEPARTMENT_IDS["IT Support"];
     }
     
     return {
@@ -627,17 +626,16 @@ export async function routeTicket(ticket: TicketWithRelations): Promise<any> {
   } catch (error) {
     console.error("❌ Critical error in routing process:", error);
     
-    // Emergency fallback - fetch departments for default ID
-    const fallbackDepts = await fetchDepartments();
-    const defaultDept = fallbackDepts.find(d => d.name === "IT Support") || fallbackDepts[0];
+    // Emergency fallback - use hardcoded department ID
+    const defaultDeptId = DEPARTMENT_IDS["IT Support"];
     
     // Return a safe default
     return {
       ticket: ticket,
       department_evaluations: [],
       routing_decision: {
-        assigned_department: defaultDept.name,
-        department_id: defaultDept.id,
+        assigned_department: "IT Support",
+        department_id: defaultDeptId,
         reason: "An error occurred during the routing process. Defaulting to IT Support.",
         confidence: 30,
         priority: normalizePriority(ticket.priority),

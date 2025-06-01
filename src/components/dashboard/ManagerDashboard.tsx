@@ -10,6 +10,12 @@ import { UserProfile } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { ticketService } from '@/lib/ticket-service';
 import { embeddingsService } from '@/lib/embeddings-service';
+import { 
+  DEPARTMENT_IDS, 
+  getDepartmentNameById, 
+  isValidDepartmentId, 
+  getDefaultDepartmentId 
+} from '@/lib/constants';
 
 interface ManagerDashboardProps {
   currentUser: UserProfile;
@@ -20,12 +26,36 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
   const [departmentAgents, setDepartmentAgents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [userDepartmentId, setUserDepartmentId] = useState<string | null>(null);
+
+  // Determine the correct department ID when component mounts
+  useEffect(() => {
+    if (currentUser?.department_id) {
+      const deptId = currentUser.department_id;
+      console.log('🔍 Manager department_id:', deptId);
+      
+      // Validate if it's one of our known department IDs
+      if (isValidDepartmentId(deptId)) {
+        console.log('✅ Manager department_id is valid:', deptId);
+        setUserDepartmentId(deptId);
+      } else {
+        console.warn('⚠️ Manager department_id not recognized:', deptId);
+        
+        // For a manager, we should not default to a department without reason
+        // Log the issue for debugging, but still use their assigned department
+        setUserDepartmentId(deptId);
+      }
+    }
+  }, [currentUser]);
 
   // Fetch department data
   useEffect(() => {
     const fetchDepartmentData = async () => {
       try {
-        if (!currentUser?.department_id) return;
+        if (!userDepartmentId) return;
+        
+        console.log('🔍 Fetching data for department:', getDepartmentNameById(userDepartmentId));
+        console.log('🔍 Using department_id:', userDepartmentId);
 
         // Fetch tickets for the manager's department
         const { data: ticketsData, error: ticketsError } = await supabase
@@ -43,12 +73,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
             assigned_agent:users!tickets_assigned_to_fkey(name),
             category:categories(name)
           `)
-          .eq('department_id', currentUser.department_id)
+          .eq('department_id', userDepartmentId)
           .order('created_at', { ascending: false });
 
         if (ticketsError) {
-          console.error('Error fetching department tickets:', ticketsError);
+          console.error('❌ Error fetching department tickets:', ticketsError);
         } else {
+          console.log('✅ Department tickets fetched:', ticketsData?.length || 0);
           setDepartmentTickets(ticketsData || []);
         }
 
@@ -63,23 +94,29 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
             job_title,
             expertise_areas
           `)
-          .eq('department_id', currentUser.department_id)
+          .eq('department_id', userDepartmentId)
           .eq('role', 'support_agent');
 
         if (agentsError) {
-          console.error('Error fetching department agents:', agentsError);
+          console.error('❌ Error fetching department agents:', agentsError);
         } else {
+          console.log('✅ Department agents fetched:', agentsData?.length || 0);
           setDepartmentAgents(agentsData || []);
         }
       } catch (error) {
-        console.error('Error fetching department data:', error);
+        console.error('❌ Error fetching department data:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchDepartmentData();
-  }, [currentUser]);
+    if (userDepartmentId) {
+      fetchDepartmentData();
+    } else if (currentUser?.id) {
+      // If we have the user but not the department ID yet, set loading state
+      setIsLoading(true);
+    }
+  }, [userDepartmentId]);
 
   // Fetch all tickets for AI training when component mounts
   useEffect(() => {
@@ -178,7 +215,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
       {/* Department Overview */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-lg">
         <h1 className="text-2xl font-bold mb-2">Department Management</h1>
-        <p className="text-indigo-100">IT Support Department - {currentUser.name}</p>
+        <p className="text-indigo-100">{getDepartmentNameById(userDepartmentId || '')} Department - {currentUser.name}</p>
       </div>
 
       {/* Key Metrics */}
