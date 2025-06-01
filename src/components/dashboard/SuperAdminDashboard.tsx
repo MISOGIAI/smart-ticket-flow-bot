@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Settings, Users, Database, BarChart3, Shield, TrendingUp } from 'lucide-react';
+import { Settings, Users, Database, BarChart3, Shield, TrendingUp, Plus, FileText, MessageSquare } from 'lucide-react';
 import { UserProfile } from '@/components/auth/AuthProvider';
 
 interface SuperAdminDashboardProps {
