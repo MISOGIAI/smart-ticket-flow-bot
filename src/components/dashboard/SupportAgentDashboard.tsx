@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSquare, Clock, CheckCircle, Archive, User, Lightbulb, FileText, Sparkles } from 'lucide-react';
+import { MessageSquare, Clock, CheckCircle, Archive, User, Lightbulb, FileText, Sparkles, BarChart3, RefreshCw, AlertCircle } from 'lucide-react';
 import { UserProfile } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import TicketDetailModal from '@/components/TicketDetailModal';
 import { ticketService } from '@/lib/ticket-service';
 import { embeddingsService } from '@/lib/embeddings-service';
 import { DEPARTMENT_IDS, getDepartmentNameById, isValidDepartmentId, getDefaultDepartmentId } from '@/lib/constants';
+import { useNavigate } from 'react-router-dom';
 
 // Utility function to check database structure
 const checkDatabaseSchema = async (currentUser: UserProfile | null) => {
@@ -84,6 +85,7 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
   const [departmentQueue, setDepartmentQueue] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userDepartmentId, setUserDepartmentId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // Determine the correct department ID when component mounts
   useEffect(() => {
@@ -342,6 +344,53 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
     }
   };
 
+  const fetchUnassignedTickets = async () => {
+    // Existing code for fetching unassigned tickets
+  };
+
+  // Add a new component for the AI tools section
+  const renderAIToolsSection = () => (
+    <Card className="border-blue-200 hover:border-blue-400 transition-colors">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-blue-500" />
+          AI Pattern Detection
+        </CardTitle>
+        <CardDescription>
+          Analyze department tickets to identify patterns, automation opportunities, and potential issues
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-4 text-sm text-gray-600">
+          Use AI to analyze ticket patterns in your department to:
+        </p>
+        <ul className="mb-4 space-y-2 text-sm text-gray-600">
+          <li className="flex items-start gap-2">
+            <BarChart3 className="h-4 w-4 mt-0.5 text-blue-500" />
+            <span>Identify common issues and trends</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <RefreshCw className="h-4 w-4 mt-0.5 text-blue-500" />
+            <span>Detect repetitive work that could be automated</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 text-blue-500" />
+            <span>Recognize potential misuse patterns</span>
+          </li>
+        </ul>
+      </CardContent>
+      <CardFooter>
+        <Button
+          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+          onClick={() => navigate('/pattern-detection')}
+        >
+          <Sparkles className="mr-2 h-4 w-4" />
+          Open Pattern Detection
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -352,57 +401,69 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
 
   return (
     <div className="space-y-6">
-      {/* Agent Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Support Agent Dashboard Header */}
+      <div className="space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight">Support Agent Dashboard</h2>
+        <p className="text-muted-foreground">
+          Welcome back, {currentUser?.name}! Manage and resolve support tickets efficiently.
+        </p>
+      </div>
+
+      {/* AI Tools & Quick Stats Section */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* First 3 stats cards */}
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <MessageSquare className="h-5 w-5 text-blue-600" />
-              <div>
-                <p className="text-sm text-gray-600">Assigned</p>
-                <p className="text-2xl font-bold">{assignedTickets.length}</p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              My Assigned Tickets
+            </CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{assignedTickets.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {assignedTickets.filter(t => t.status === 'open').length} open / {assignedTickets.filter(t => t.status === 'in_progress').length} in progress
+            </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Clock className="h-5 w-5 text-amber-600" />
-              <div>
-                <p className="text-sm text-gray-600">In Progress</p>
-                <p className="text-2xl font-bold">
-                  {assignedTickets.filter(t => t.status === 'in_progress').length}
-                </p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Department Queue
+            </CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{departmentQueue.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Unassigned tickets in your department
+            </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm text-gray-600">Resolved Today</p>
-                <p className="text-2xl font-bold">8</p>
-              </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Resolved This Week
+            </CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {assignedTickets.filter(ticket => 
+                ticket.status === 'resolved' && 
+                new Date(ticket.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+              ).length}
             </div>
+            <p className="text-xs text-muted-foreground">
+              Tickets you've resolved in the past 7 days
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <User className="h-5 w-5 text-purple-600" />
-              <div>
-                <p className="text-sm text-gray-600">Avg Response</p>
-                <p className="text-2xl font-bold">2.1h</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* AI Pattern Detection Card */}
+        {renderAIToolsSection()}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

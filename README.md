@@ -59,6 +59,36 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase for authentication and database
+- OpenAI API for AI-powered pattern detection
+
+## Environment Variables
+
+For the application to work correctly, you need to set up the following environment variables in a `.env` file:
+
+```
+# Supabase Configuration
+VITE_SUPABASE_URL=your_supabase_url_here
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+
+# OpenAI API Key for Pattern Detection
+VITE_OPENAI_API_KEY=your_openai_api_key_here
+```
+
+## Pattern Detection Feature
+
+The application includes an AI-powered pattern detection system that helps support agents identify:
+
+1. **Repetitive Work Patterns** - Identifies common issues that could benefit from automation or knowledge base articles
+2. **Misuse Patterns** - Detects potential security concerns or policy violations specific to each department
+
+This feature is accessible only to users with the 'support_agent' or 'manager' role, and analyzes tickets within their specific department.
+
+To use this feature:
+- Log in as a support agent
+- Click on "Open Pattern Detection" from the dashboard
+- Select the desired timeframe (7, 30, or 90 days)
+- Click "Run Analysis" to generate insights
 
 ## How can I deploy this project?
 
