@@ -69,11 +69,11 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
               created_at,
               updated_at,
               requester:users!tickets_requester_id_fkey(name),
-              category:categories!inner(name, department_id),
+              category:categories(name),
               department:departments(name)
             `)
             .is('assigned_to', null)
-            .eq('category.department_id', currentUser.department_id)
+            .eq('department_id', currentUser.department_id)
             .order('created_at', { ascending: false });
 
           if (queueError) {
@@ -213,11 +213,11 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
                 created_at,
                 updated_at,
                 requester:users!tickets_requester_id_fkey(name),
-                category:categories!inner(name, department_id),
+                category:categories(name),
                 department:departments(name)
               `)
               .is('assigned_to', null)
-              .eq('category.department_id', currentUser.department_id)
+              .eq('department_id', currentUser.department_id)
               .order('created_at', { ascending: false });
 
             if (!queueError) {
