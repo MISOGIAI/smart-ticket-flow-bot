@@ -40,7 +40,6 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
     department_id: '',
     expertise_areas: '',
     reports_to: '',
-    admin_code: '',
   });
 
   useEffect(() => {
@@ -103,16 +102,6 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
       toast({
         title: "Department Required",
         description: "Managers must select a department to manage",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
-
-    if (formData.role === 'super_admin' && !roleSpecificData.admin_code) {
-      toast({
-        title: "Admin Code Required",
-        description: "Super admin role requires verification code",
         variant: "destructive",
       });
       setLoading(false);
@@ -224,41 +213,11 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
         </div>
       )}
 
-      {formData.role === 'support_agent' && (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="department">Department (Required)</Label>
-            <Select 
-              value={roleSpecificData.department_id} 
-              onValueChange={(value) => setRoleSpecificData({ ...roleSpecificData, department_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="expertise">Expertise Areas (Optional)</Label>
-            <Input
-              id="expertise"
-              value={roleSpecificData.expertise_areas}
-              onChange={(e) => setRoleSpecificData({ ...roleSpecificData, expertise_areas: e.target.value })}
-              placeholder="e.g., Password Reset, Network Issues (comma separated)"
-            />
-          </div>
-        </>
-      )}
-
-      {formData.role === 'manager' && (
+      {(formData.role === 'support_agent' || formData.role === 'manager') && (
         <div className="space-y-2">
-          <Label htmlFor="department">Department to Manage (Required)</Label>
+          <Label htmlFor="department">
+            Department {formData.role === 'manager' ? '(Required)' : '(Required)'}
+          </Label>
           <Select 
             value={roleSpecificData.department_id} 
             onValueChange={(value) => setRoleSpecificData({ ...roleSpecificData, department_id: value })}
@@ -277,15 +236,14 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
         </div>
       )}
 
-      {formData.role === 'super_admin' && (
+      {formData.role === 'support_agent' && (
         <div className="space-y-2">
-          <Label htmlFor="admin_code">Admin Verification Code (Required)</Label>
+          <Label htmlFor="expertise">Expertise Areas (Optional)</Label>
           <Input
-            id="admin_code"
-            type="password"
-            value={roleSpecificData.admin_code}
-            onChange={(e) => setRoleSpecificData({ ...roleSpecificData, admin_code: e.target.value })}
-            placeholder="Enter admin verification code"
+            id="expertise"
+            value={roleSpecificData.expertise_areas}
+            onChange={(e) => setRoleSpecificData({ ...roleSpecificData, expertise_areas: e.target.value })}
+            placeholder="e.g., Password Reset, Network Issues (comma separated)"
           />
         </div>
       )}

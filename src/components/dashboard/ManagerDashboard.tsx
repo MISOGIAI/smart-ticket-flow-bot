@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Users, Clock, TrendingUp, MessageSquare, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Users, MessageSquare, Clock, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
 import { UserProfile } from '@/components/auth/AuthProvider';
 
 interface ManagerDashboardProps {
@@ -13,54 +13,7 @@ interface ManagerDashboardProps {
 }
 
 const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
-  // Sample analytics data
-  const weeklyData = [
-    { day: 'Mon', tickets: 24, resolved: 18 },
-    { day: 'Tue', tickets: 28, resolved: 22 },
-    { day: 'Wed', tickets: 32, resolved: 25 },
-    { day: 'Thu', tickets: 19, resolved: 16 },
-    { day: 'Fri', tickets: 26, resolved: 24 },
-    { day: 'Sat', tickets: 8, resolved: 6 },
-    { day: 'Sun', tickets: 5, resolved: 4 }
-  ];
-
-  const responseTimeData = [
-    { day: 'Mon', avgTime: 2.3 },
-    { day: 'Tue', avgTime: 1.8 },
-    { day: 'Wed', avgTime: 2.1 },
-    { day: 'Thu', avgTime: 1.9 },
-    { day: 'Fri', avgTime: 2.5 },
-    { day: 'Sat', avgTime: 3.2 },
-    { day: 'Sun', avgTime: 2.8 }
-  ];
-
-  const teamMembers = [
-    {
-      name: 'Sarah Johnson',
-      role: 'Senior Support Agent',
-      assignedTickets: 8,
-      resolvedToday: 3,
-      avgResponseTime: '1.2h',
-      status: 'available'
-    },
-    {
-      name: 'David Kumar',
-      role: 'Support Agent',
-      assignedTickets: 12,
-      resolvedToday: 5,
-      avgResponseTime: '2.1h',
-      status: 'busy'
-    },
-    {
-      name: 'Jennifer Adams',
-      role: 'Support Agent',
-      assignedTickets: 6,
-      resolvedToday: 4,
-      avgResponseTime: '1.8h',
-      status: 'available'
-    }
-  ];
-
+  // Sample data for manager's department
   const departmentTickets = [
     {
       id: 'TK-001',
@@ -68,28 +21,79 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
       requester: 'Mike Chen',
       assignedTo: 'Sarah Johnson',
       priority: 'high',
-      status: 'open',
+      status: 'in_progress',
       created: '2024-01-15T10:30:00Z'
     },
     {
       id: 'TK-002',
-      title: 'Software installation',
+      title: 'Software installation request',
       requester: 'Lisa Wong',
-      assignedTo: 'David Kumar',
+      assignedTo: 'Tom Wilson',
       priority: 'medium',
-      status: 'in_progress',
-      created: '2024-01-14T14:20:00Z'
-    },
-    {
-      id: 'TK-009',
-      title: 'Network connectivity issue',
-      requester: 'John Smith',
-      assignedTo: null,
-      priority: 'critical',
       status: 'open',
-      created: '2024-01-15T15:45:00Z'
+      created: '2024-01-14T14:20:00Z'
     }
   ];
+
+  const teamMembers = [
+    {
+      name: 'Sarah Johnson',
+      role: 'Support Agent',
+      assignedTickets: 8,
+      resolvedToday: 3,
+      avgResponseTime: '2.1h',
+      status: 'active'
+    },
+    {
+      name: 'Tom Wilson',
+      role: 'Support Agent',
+      assignedTickets: 6,
+      resolvedToday: 4,
+      avgResponseTime: '1.8h',
+      status: 'active'
+    }
+  ];
+
+  const weeklyData = [
+    { day: 'Mon', tickets: 12, resolved: 10 },
+    { day: 'Tue', tickets: 15, resolved: 13 },
+    { day: 'Wed', tickets: 18, resolved: 16 },
+    { day: 'Thu', tickets: 14, resolved: 12 },
+    { day: 'Fri', tickets: 20, resolved: 18 },
+    { day: 'Sat', tickets: 8, resolved: 7 },
+    { day: 'Sun', tickets: 5, resolved: 5 }
+  ];
+
+  const responseTimeData = [
+    { hour: '9AM', avgTime: 2.5 },
+    { hour: '10AM', avgTime: 1.8 },
+    { hour: '11AM', avgTime: 2.1 },
+    { hour: '12PM', avgTime: 3.2 },
+    { hour: '1PM', avgTime: 2.8 },
+    { hour: '2PM', avgTime: 1.9 },
+    { hour: '3PM', avgTime: 2.3 },
+    { hour: '4PM', avgTime: 2.7 }
+  ];
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'text-red-600 bg-red-100';
+      case 'high': return 'text-orange-600 bg-orange-100';
+      case 'medium': return 'text-amber-600 bg-amber-100';
+      case 'low': return 'text-green-600 bg-green-100';
+      default: return 'text-gray-600 bg-gray-100';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open': return 'bg-blue-100 text-blue-800';
+      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
+      case 'resolved': return 'bg-green-100 text-green-800';
+      case 'closed': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -100,22 +104,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
     });
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'critical': return 'border-l-red-600 bg-red-50';
-      case 'high': return 'border-l-orange-600 bg-orange-50';
-      case 'medium': return 'border-l-amber-600 bg-amber-50';
-      case 'low': return 'border-l-green-600 bg-green-50';
-      default: return 'border-l-gray-300 bg-gray-50';
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Department Overview */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-lg">
-        <h1 className="text-2xl font-bold mb-2">IT Support Department</h1>
-        <p className="text-blue-100">Department Overview & Team Management</p>
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-lg">
+        <h1 className="text-2xl font-bold mb-2">Department Management</h1>
+        <p className="text-indigo-100">IT Support Department - {currentUser.name}</p>
       </div>
 
       {/* Key Metrics */}
@@ -126,8 +120,21 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
               <MessageSquare className="h-5 w-5 text-blue-600" />
               <div>
                 <p className="text-sm text-gray-600">Total Tickets</p>
-                <p className="text-2xl font-bold">142</p>
-                <p className="text-xs text-green-600">+12% vs last week</p>
+                <p className="text-2xl font-bold">{departmentTickets.length}</p>
+                <p className="text-xs text-green-600">+12% this week</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Users className="h-5 w-5 text-purple-600" />
+              <div>
+                <p className="text-sm text-gray-600">Team Members</p>
+                <p className="text-2xl font-bold">{teamMembers.length}</p>
+                <p className="text-xs text-blue-600">All active</p>
               </div>
             </div>
           </CardContent>
@@ -139,8 +146,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
               <Clock className="h-5 w-5 text-amber-600" />
               <div>
                 <p className="text-sm text-gray-600">Avg Response</p>
-                <p className="text-2xl font-bold">2.3h</p>
-                <p className="text-xs text-red-600">+15% vs target</p>
+                <p className="text-2xl font-bold">2.0h</p>
+                <p className="text-xs text-green-600">-15% vs last week</p>
               </div>
             </div>
           </CardContent>
@@ -149,24 +156,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+              <TrendingUp className="h-5 w-5 text-green-600" />
               <div>
                 <p className="text-sm text-gray-600">Resolution Rate</p>
-                <p className="text-2xl font-bold">89%</p>
-                <p className="text-xs text-green-600">+3% vs last week</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-purple-600" />
-              <div>
-                <p className="text-sm text-gray-600">Satisfaction</p>
-                <p className="text-2xl font-bold">4.6/5</p>
-                <p className="text-xs text-green-600">+0.2 vs last month</p>
+                <p className="text-2xl font-bold">94%</p>
+                <p className="text-xs text-green-600">+3% vs target</p>
               </div>
             </div>
           </CardContent>
@@ -175,164 +169,116 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
 
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="team">Team Management</TabsTrigger>
+          <TabsTrigger value="overview">Team Overview</TabsTrigger>
           <TabsTrigger value="tickets">All Tickets</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Weekly Ticket Volume</CardTitle>
-                <CardDescription>Tickets created vs resolved this week</CardDescription>
+                <CardTitle>Team Performance</CardTitle>
+                <CardDescription>Individual agent metrics</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={weeklyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="day" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="tickets" fill="#3b82f6" name="Created" />
-                    <Bar dataKey="resolved" fill="#10b981" name="Resolved" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="space-y-4">
+                  {teamMembers.map((member, index) => (
+                    <div key={index} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h4 className="font-semibold">{member.name}</h4>
+                          <p className="text-sm text-gray-600">{member.role}</p>
+                        </div>
+                        <Badge variant="outline" className="bg-green-50 text-green-700">
+                          {member.status}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600">Assigned</p>
+                          <p className="font-semibold">{member.assignedTickets}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Resolved Today</p>
+                          <p className="font-semibold">{member.resolvedToday}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Avg Response</p>
+                          <p className="font-semibold">{member.avgResponseTime}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Response Time Trend</CardTitle>
-                <CardDescription>Average response time in hours</CardDescription>
+                <CardTitle>Weekly Ticket Volume</CardTitle>
+                <CardDescription>New vs resolved tickets this week</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={responseTimeData}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={weeklyData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="day" />
                     <YAxis />
                     <Tooltip />
-                    <Line type="monotone" dataKey="avgTime" stroke="#f59e0b" strokeWidth={2} />
-                  </LineChart>
+                    <Bar dataKey="tickets" fill="#3b82f6" name="New Tickets" />
+                    <Bar dataKey="resolved" fill="#10b981" name="Resolved" />
+                  </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="team" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Users className="h-5 w-5" />
-                <span>Team Performance</span>
-              </CardTitle>
-              <CardDescription>Monitor your team's workload and performance</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {teamMembers.map((member, index) => (
-                  <div key={index} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-blue-600 font-semibold">
-                            {member.name.split(' ').map(n => n[0]).join('')}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="font-medium">{member.name}</p>
-                          <p className="text-sm text-gray-600">{member.role}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <Badge 
-                          variant={member.status === 'available' ? 'default' : 'secondary'}
-                          className={member.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}
-                        >
-                          {member.status}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 mt-3 text-sm">
-                      <div>
-                        <p className="text-gray-600">Assigned</p>
-                        <p className="font-semibold">{member.assignedTickets}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Resolved Today</p>
-                        <p className="font-semibold">{member.resolvedToday}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Avg Response</p>
-                        <p className="font-semibold">{member.avgResponseTime}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="tickets" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Department Tickets</CardTitle>
-              <CardDescription>All tickets in your department</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Department Tickets</CardTitle>
+                  <CardDescription>All tickets in your department</CardDescription>
+                </div>
+                <Button variant="outline">
+                  Export Report
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {departmentTickets.map((ticket) => (
-                  <div
-                    key={ticket.id}
-                    className={`border-l-4 p-4 rounded-r-lg ${getPriorityColor(ticket.priority)} hover:shadow-md transition-shadow`}
-                  >
-                    <div className="flex items-start justify-between">
+                  <div key={ticket.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-2">
-                          <span className="font-medium">{ticket.title}</span>
+                          <h4 className="font-medium">{ticket.title}</h4>
                           <Badge variant="outline" className="text-xs">
                             {ticket.id}
                           </Badge>
-                          {!ticket.assignedTo && (
-                            <Badge variant="destructive" className="text-xs">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              Unassigned
-                            </Badge>
-                          )}
                         </div>
                         <div className="flex items-center space-x-4 text-sm text-gray-600">
                           <span>Requester: {ticket.requester}</span>
-                          {ticket.assignedTo && (
-                            <>
-                              <span>•</span>
-                              <span>Assigned to: {ticket.assignedTo}</span>
-                            </>
-                          )}
+                          <span>•</span>
+                          <span>Assigned to: {ticket.assignedTo}</span>
                           <span>•</span>
                           <span>{formatDate(ticket.created)}</span>
                         </div>
                       </div>
-                      <div className="flex flex-col space-y-2">
-                        <Badge 
-                          variant="outline"
-                          className={
-                            ticket.priority === 'critical' ? 'text-red-800 border-red-300' :
-                            ticket.priority === 'high' ? 'text-orange-800 border-orange-300' :
-                            ticket.priority === 'medium' ? 'text-amber-800 border-amber-300' :
-                            'text-green-800 border-green-300'
-                          }
-                        >
+                      <div className="flex items-center space-x-3">
+                        <Badge className={getPriorityColor(ticket.priority)}>
                           {ticket.priority.toUpperCase()}
                         </Badge>
-                        {!ticket.assignedTo && (
-                          <Button size="sm" variant="outline">
-                            Assign
-                          </Button>
-                        )}
+                        <Badge className={getStatusColor(ticket.status)}>
+                          {ticket.status.replace('_', ' ').toUpperCase()}
+                        </Badge>
+                        <Button size="sm" variant="outline">
+                          Reassign
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -346,59 +292,76 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Ticket Categories</CardTitle>
-                <CardDescription>Distribution of ticket types</CardDescription>
+                <CardTitle>Response Time Trends</CardTitle>
+                <CardDescription>Average response time throughout the day</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {[
-                    { category: 'Password Reset', count: 45, percentage: 32 },
-                    { category: 'Software Issues', count: 38, percentage: 27 },
-                    { category: 'Hardware Problems', count: 28, percentage: 20 },
-                    { category: 'Network Issues', count: 31, percentage: 21 }
-                  ].map((item, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <span className="text-sm">{item.category}</span>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full" 
-                            style={{ width: `${item.percentage}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm font-medium">{item.count}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={responseTimeData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="hour" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="avgTime" stroke="#8884d8" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
                 <CardTitle>Performance Metrics</CardTitle>
-                <CardDescription>Key performance indicators</CardDescription>
+                <CardDescription>Key department indicators</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                  <span className="text-sm font-medium">First Response SLA</span>
-                  <span className="text-green-600 font-bold">94%</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg">
-                  <span className="text-sm font-medium">Resolution SLA</span>
-                  <span className="text-amber-600 font-bold">87%</span>
+                  <span className="text-sm font-medium">Customer Satisfaction</span>
+                  <span className="text-green-600 font-bold">4.7/5</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                  <span className="text-sm font-medium">Customer Satisfaction</span>
-                  <span className="text-blue-600 font-bold">4.6/5</span>
+                  <span className="text-sm font-medium">First Contact Resolution</span>
+                  <span className="text-blue-600 font-bold">78%</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg">
+                  <span className="text-sm font-medium">Escalation Rate</span>
+                  <span className="text-amber-600 font-bold">12%</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                  <span className="text-sm font-medium">Reopened Tickets</span>
-                  <span className="text-purple-600 font-bold">3%</span>
+                  <span className="text-sm font-medium">SLA Compliance</span>
+                  <span className="text-purple-600 font-bold">96%</span>
                 </div>
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Generate Reports</CardTitle>
+              <CardDescription>Export detailed analytics and performance reports</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Button variant="outline" className="h-24 flex-col">
+                  <CheckCircle className="h-6 w-6 mb-2" />
+                  Weekly Performance Report
+                </Button>
+                <Button variant="outline" className="h-24 flex-col">
+                  <Users className="h-6 w-6 mb-2" />
+                  Team Productivity Report
+                </Button>
+                <Button variant="outline" className="h-24 flex-col">
+                  <TrendingUp className="h-6 w-6 mb-2" />
+                  Trend Analysis Report
+                </Button>
+                <Button variant="outline" className="h-24 flex-col">
+                  <AlertCircle className="h-6 w-6 mb-2" />
+                  SLA Compliance Report
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
