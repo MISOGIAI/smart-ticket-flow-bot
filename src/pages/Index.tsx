@@ -4,26 +4,35 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, BarChart3, Users, MessageSquare, Settings } from 'lucide-react';
+import { Plus, Search, BarChart3, Users, MessageSquare, Settings, LogOut } from 'lucide-react';
 import TicketCreationForm from '@/components/TicketCreationForm';
 import TicketList from '@/components/TicketList';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 import KnowledgeBase from '@/components/KnowledgeBase';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/components/auth/AuthProvider';
+import AuthPage from '@/components/auth/AuthPage';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCreateTicket, setShowCreateTicket] = useState(false);
   const { toast } = useToast();
+  const { user, userProfile, loading, signOut } = useAuth();
 
-  // Simulated user role - in real app, this would come from authentication
-  const [currentUser] = useState({
-    id: '1',
-    name: 'John Doe',
-    email: 'john@company.com',
-    role: 'agent', // 'user', 'agent', 'manager'
-    department: 'IT Support'
-  });
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || !userProfile) {
+    return <AuthPage />;
+  }
 
   const handleCreateTicket = () => {
     setShowCreateTicket(true);
@@ -35,6 +44,14 @@ const Index = () => {
     toast({
       title: "Ticket Created Successfully",
       description: "Your ticket has been submitted and routed to the appropriate department.",
+    });
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast({
+      title: "Signed Out",
+      description: "You have been successfully signed out.",
     });
   };
 
@@ -63,9 +80,12 @@ const Index = () => {
                 New Ticket
               </Button>
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
-                <p className="text-xs text-gray-500">{currentUser.department}</p>
+                <p className="text-sm font-medium text-gray-900">{userProfile.name}</p>
+                <p className="text-xs text-gray-500">{userProfile.role.replace('_', ' ').toUpperCase()}</p>
               </div>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
@@ -94,18 +114,18 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            <DashboardOverview currentUser={currentUser} />
+            <DashboardOverview currentUser={userProfile} />
           </TabsContent>
 
           <TabsContent value="tickets" className="space-y-6">
             {showCreateTicket ? (
               <TicketCreationForm 
-                currentUser={currentUser}
+                currentUser={userProfile}
                 onTicketCreated={handleTicketCreated}
                 onCancel={() => setShowCreateTicket(false)}
               />
             ) : (
-              <TicketList currentUser={currentUser} onCreateTicket={handleCreateTicket} />
+              <TicketList currentUser={userProfile} onCreateTicket={handleCreateTicket} />
             )}
           </TabsContent>
 
@@ -114,7 +134,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
-            <AnalyticsDashboard currentUser={currentUser} />
+            <AnalyticsDashboard currentUser={userProfile} />
           </TabsContent>
         </Tabs>
       </main>
