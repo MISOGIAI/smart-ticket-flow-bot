@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Settings, Users, Database, BarChart3, Shield, TrendingUp, Plus, FileText, MessageSquare } from 'lucide-react';
+import { Settings, Users, Database, BarChart3, Shield, TrendingUp, Plus, FileText, MessageSquare, Lightbulb } from 'lucide-react';
 import { UserProfile } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { ticketService } from '@/lib/ticket-service';
 import { embeddingsService } from '@/lib/embeddings-service';
+import { Link } from 'react-router-dom';
 
 interface SuperAdminDashboardProps {
   currentUser: UserProfile;
@@ -178,9 +179,25 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ currentUser }
   return (
     <div className="space-y-6">
       {/* System Overview */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-lg">
-        <h1 className="text-2xl font-bold mb-2">System Administration</h1>
-        <p className="text-purple-100">Complete system overview and management</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">System Administration</h1>
+          <p className="text-muted-foreground">Complete system overview and management</p>
+        </div>
+        
+        <div className="flex gap-3">
+          <Link to="/self-serve-stats">
+            <Button variant="outline" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span>Self-Serve Analytics</span>
+            </Button>
+          </Link>
+          
+          <Button variant="outline" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            <span>System Settings</span>
+          </Button>
+        </div>
       </div>
 
       {/* System-wide KPIs */}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Link } from 'react-router-dom';
 import { 
   MessageSquare, 
   Zap, 
@@ -133,6 +134,15 @@ const LandingPage: React.FC = () => {
             </div>
             
             <div className="flex items-center space-x-2 sm:space-x-4">
+              <Link to="/self-serve-help">
+                <Button 
+                  variant="ghost" 
+                  className="text-gray-700 hover:text-gray-900 text-sm sm:text-base px-2 sm:px-4"
+                >
+                  <Lightbulb className="h-4 w-4 mr-1" />
+                  Self-Serve Help
+                </Button>
+              </Link>
               <Button 
                 variant="ghost" 
                 onClick={() => {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter, Plus, MessageSquare, Clock, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import TicketDetailModal from '@/components/TicketDetailModal';
 
 interface TicketListProps {
   currentUser: any;
@@ -19,6 +19,8 @@ const TicketList: React.FC<TicketListProps> = ({ currentUser, onCreateTicket }) 
   const [filterPriority, setFilterPriority] = useState('all');
   const [tickets, setTickets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Fetch tickets from database
   useEffect(() => {
@@ -59,6 +61,54 @@ const TicketList: React.FC<TicketListProps> = ({ currentUser, onCreateTicket }) 
       fetchTickets();
     }
   }, [currentUser]);
+
+  const handleTicketClick = (ticketId: string) => {
+    setSelectedTicket(ticketId);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedTicket(null);
+  };
+
+  const handleTicketUpdate = () => {
+    // Refresh tickets after update
+    if (currentUser?.id) {
+      const fetchTickets = async () => {
+        try {
+          const { data: ticketsData, error } = await supabase
+            .from('tickets')
+            .select(`
+              id,
+              title,
+              description,
+              priority,
+              status,
+              ticket_number,
+              created_at,
+              updated_at,
+              requester:users!tickets_requester_id_fkey(name),
+              assigned_agent:users!tickets_assigned_to_fkey(name),
+              category:categories(name),
+              department:departments(name)
+            `)
+            .eq('requester_id', currentUser?.id)
+            .order('created_at', { ascending: false });
+
+          if (error) {
+            console.error('Error fetching tickets:', error);
+          } else {
+            setTickets(ticketsData || []);
+          }
+        } catch (error) {
+          console.error('Error refreshing tickets:', error);
+        }
+      };
+      
+      fetchTickets();
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -102,17 +152,6 @@ const TicketList: React.FC<TicketListProps> = ({ currentUser, onCreateTicket }) 
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Tickets</h2>
-          <p className="text-gray-600">Manage and track support requests</p>
-        </div>
-        <Button onClick={onCreateTicket} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-          <Plus className="h-4 w-4 mr-2" />
-          New Ticket
-        </Button>
-      </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
@@ -182,7 +221,7 @@ const TicketList: React.FC<TicketListProps> = ({ currentUser, onCreateTicket }) 
           </div>
         ) : (
           filteredTickets.map((ticket) => (
-            <Card key={ticket.id} className="hover:shadow-lg transition-shadow duration-200 cursor-pointer">
+            <Card key={ticket.id} className="hover:shadow-lg transition-shadow duration-200">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -215,7 +254,7 @@ const TicketList: React.FC<TicketListProps> = ({ currentUser, onCreateTicket }) 
                     </div>
                     <div className="flex items-center space-x-1">
                       <User className="h-4 w-4" />
-                      <span>{ticket.assigned_agent?.name || 'Unassigned'}</span>
+                      <span>{ticket.assigned_agent?.name || ticket.department?.name || 'Department'}</span>
                     </div>
                   </div>
                   
@@ -225,7 +264,7 @@ const TicketList: React.FC<TicketListProps> = ({ currentUser, onCreateTicket }) 
                     </div>
                     <div className="flex items-center space-x-1">
                       <Clock className="h-4 w-4" />
-                      <span>Pending</span>
+                      <span>{ticket.status?.replace('_', ' ').charAt(0).toUpperCase() + ticket.status?.replace('_', ' ').slice(1)}</span>
                     </div>
                   </div>
 
@@ -237,7 +276,11 @@ const TicketList: React.FC<TicketListProps> = ({ currentUser, onCreateTicket }) 
                   <div className="pt-2 border-t">
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-gray-500">Created by {ticket.requester?.name || 'You'}</span>
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleTicketClick(ticket.id)}
+                      >
                         View Details
                       </Button>
                     </div>
@@ -249,7 +292,14 @@ const TicketList: React.FC<TicketListProps> = ({ currentUser, onCreateTicket }) 
         )}
       </div>
 
-
+      {/* Ticket Detail Modal */}
+      <TicketDetailModal
+        ticketId={selectedTicket}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        currentUser={currentUser}
+        onTicketUpdate={handleTicketUpdate}
+      />
     </div>
   );
 };

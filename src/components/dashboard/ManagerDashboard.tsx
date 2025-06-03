@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Users, MessageSquare, Clock, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
+import { Users, MessageSquare, Clock, TrendingUp, CheckCircle, AlertCircle, Lightbulb, BarChart3 } from 'lucide-react';
 import { UserProfile } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { ticketService } from '@/lib/ticket-service';
 import { embeddingsService } from '@/lib/embeddings-service';
+import { Link } from 'react-router-dom';
 import { 
   DEPARTMENT_IDS, 
   getDepartmentNameById, 
@@ -212,6 +213,26 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ currentUser }) => {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            Welcome back, {currentUser.name}
+          </h2>
+          <p className="text-muted-foreground">
+            Here's what's happening in your department today
+          </p>
+        </div>
+        
+        <div className="flex gap-3">
+          <Link to="/self-serve-stats">
+            <Button variant="outline" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span>Self-Serve Analytics</span>
+            </Button>
+          </Link>
+        </div>
+      </div>
+
       {/* Department Overview */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-lg">
         <h1 className="text-2xl font-bold mb-2">Department Management</h1>

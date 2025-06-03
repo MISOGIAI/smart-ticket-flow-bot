@@ -21,18 +21,19 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUser, onCr
   useEffect(() => {
     const fetchUserTickets = async () => {
       try {
-        const { data: tickets, error } = await supabase
+        const { data, error } = await supabase
           .from('tickets')
           .select(`
             id,
             title,
             description,
-            priority,
             status,
+            priority,
             ticket_number,
             created_at,
             assigned_to,
-            users!tickets_assigned_to_fkey(name)
+            users!tickets_assigned_to_fkey(name),
+            department:departments(name)
           `)
           .eq('requester_id', currentUser.id)
           .order('created_at', { ascending: false });
@@ -40,7 +41,7 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUser, onCr
         if (error) {
           console.error('Error fetching tickets:', error);
         } else {
-          setMyTickets(tickets || []);
+          setMyTickets(data || []);
         }
       } catch (error) {
         console.error('Error fetching user tickets:', error);
@@ -199,7 +200,7 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ currentUser, onCr
                           <div className="flex items-center space-x-4 text-sm text-gray-600">
                             <span>Created: {formatDate(ticket.created_at)}</span>
                             <span>•</span>
-                            <span>Assigned to: {ticket.users?.name || 'Unassigned'}</span>
+                            <span>Assigned to: {ticket.users?.name || ticket.department?.name}</span>
                           </div>
                         </div>
                         <div className="flex flex-col space-y-2">

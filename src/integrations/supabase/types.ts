@@ -409,6 +409,57 @@ export type Database = {
           },
         ]
       }
+      ticket_responses: {
+        Row: {
+          id: string
+          ticket_id: string
+          response_text: string
+          internal_notes: string | null
+          status_before: string
+          status_after: string
+          created_at: string
+          created_by: string
+          is_ai_generated: boolean
+        }
+        Insert: {
+          id?: string
+          ticket_id: string
+          response_text: string
+          internal_notes?: string | null
+          status_before: string
+          status_after: string
+          created_at?: string
+          created_by: string
+          is_ai_generated?: boolean
+        }
+        Update: {
+          id?: string
+          ticket_id?: string
+          response_text?: string
+          internal_notes?: string | null
+          status_before?: string
+          status_after?: string
+          created_at?: string
+          created_by?: string
+          is_ai_generated?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_responses_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_responses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

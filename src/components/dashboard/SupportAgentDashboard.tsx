@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSquare, Clock, CheckCircle, Archive, User, Lightbulb, FileText, Sparkles, BarChart3, RefreshCw, AlertCircle } from 'lucide-react';
+import { MessageSquare, Clock, CheckCircle, Archive, User, Lightbulb, FileText, Sparkles, BarChart3, RefreshCw, AlertCircle, Terminal } from 'lucide-react';
 import { UserProfile } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import TicketDetailModal from '@/components/TicketDetailModal';
@@ -85,6 +85,7 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
   const [departmentQueue, setDepartmentQueue] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userDepartmentId, setUserDepartmentId] = useState<string | null>(null);
+  const [isLoadingResponses, setIsLoadingResponses] = useState(false);
   const navigate = useNavigate();
 
   // Determine the correct department ID when component mounts
@@ -348,6 +349,99 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
     // Existing code for fetching unassigned tickets
   };
 
+  // Function to fetch and log all responses for tickets in department queue
+  const fetchAndLogTicketResponses = async () => {
+    if (!userDepartmentId || departmentQueue.length === 0) {
+      console.log('No department queue tickets available to fetch responses for.');
+      return;
+    }
+    
+    try {
+      setIsLoadingResponses(true);
+      console.log('🔍 Fetching responses for department queue tickets...');
+      
+      // Get all ticket IDs from department queue
+      const ticketIds = departmentQueue.map(ticket => ticket.id);
+      console.log(`📋 Found ${ticketIds.length} tickets in department queue:`, ticketIds);
+      
+      // Fetch responses for all tickets
+      const { data, error } = await supabase
+        .from('ticket_responses')
+        .select(`
+          id,
+          content,
+          created_at,
+          ticket_id,
+          responder:users!ticket_responses_responder_id_fkey(name, email),
+          is_internal,
+          is_ai_suggested
+        `)
+        .in('ticket_id', ticketIds)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('❌ Error fetching ticket responses:', error);
+        return;
+      }
+      
+      // Use any type to avoid TypeScript errors
+      const responses = data as any[];
+      
+      // Group responses by ticket
+      const responsesByTicket: Record<string, {ticketNumber: string, ticketTitle: string, responses: any[]}> = {};
+      
+      // Initialize with empty arrays for each ticket
+      ticketIds.forEach(ticketId => {
+        const ticket = departmentQueue.find(t => t.id === ticketId);
+        responsesByTicket[ticketId] = {
+          ticketNumber: ticket?.ticket_number || ticketId,
+          ticketTitle: ticket?.title || 'Unknown Ticket',
+          responses: []
+        };
+      });
+      
+      // Add responses to their respective tickets
+      if (responses && Array.isArray(responses)) {
+        responses.forEach(response => {
+          if (response && response.ticket_id && responsesByTicket[response.ticket_id]) {
+            responsesByTicket[response.ticket_id].responses.push(response);
+          }
+        });
+      }
+      
+      // Log the results in a formatted way
+      console.group('🔊 Department Queue Ticket Responses');
+      console.log(`Total tickets: ${ticketIds.length}`);
+      console.log(`Total responses: ${responses?.length || 0}`);
+      
+      Object.entries(responsesByTicket).forEach(([ticketId, data]) => {
+        console.group(`📝 Ticket: ${data.ticketNumber} - ${data.ticketTitle}`);
+        console.log(`Response count: ${data.responses.length}`);
+        
+        if (data.responses.length > 0) {
+          console.table(data.responses.map(r => ({
+            id: r.id,
+            date: new Date(r.created_at).toLocaleString(),
+            responder: r.responder?.name || 'System',
+            isInternal: r.is_internal ? 'Yes' : 'No',
+            isAISuggested: r.is_ai_suggested ? 'Yes' : 'No',
+            content: r.content?.substring(0, 100) + (r.content?.length > 100 ? '...' : '') || 'No content'
+          })));
+        } else {
+          console.log('No responses for this ticket');
+        }
+        
+        console.groupEnd();
+      });
+      
+      console.groupEnd();
+    } catch (err) {
+      console.error('❌ Error in fetchAndLogTicketResponses:', err);
+    } finally {
+      setIsLoadingResponses(false);
+    }
+  };
+
   // Add a new component for the AI tools section
   const renderAIToolsSection = () => (
     <Card className="border-blue-200 hover:border-blue-400 transition-colors">
@@ -400,11 +494,11 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1600px] mx-auto">
       {/* Support Agent Dashboard Header */}
-      <div className="space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Support Agent Dashboard</h2>
-        <p className="text-muted-foreground">
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold tracking-tight text-gray-900 mb-2 bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent drop-shadow-sm">Support Agent Dashboard</h2>
+        <p className="text-gray-600 max-w-2xl mx-auto">
           Welcome back, {currentUser?.name}! Manage and resolve support tickets efficiently.
         </p>
       </div>
@@ -470,10 +564,32 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
         {/* Main Ticket Area */}
         <div className="lg:col-span-2">
           <Tabs defaultValue="assigned" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="assigned">My Tickets ({assignedTickets.length})</TabsTrigger>
-              <TabsTrigger value="queue">Department Queue ({departmentQueue.length})</TabsTrigger>
-            </TabsList>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+              <TabsList className="w-full sm:w-auto">
+                <TabsTrigger value="assigned">My Tickets ({assignedTickets.length})</TabsTrigger>
+                <TabsTrigger value="queue">Department Queue ({departmentQueue.length})</TabsTrigger>
+              </TabsList>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1"
+                onClick={fetchAndLogTicketResponses}
+                disabled={isLoadingResponses || departmentQueue.length === 0}
+              >
+                {isLoadingResponses ? (
+                  <>
+                    <div className="h-3 w-3 rounded-full border-2 border-t-transparent border-blue-600 animate-spin mr-1"></div>
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Terminal className="h-3 w-3 text-blue-600" />
+                    Log Ticket Responses
+                  </>
+                )}
+              </Button>
+            </div>
 
             <TabsContent value="assigned" className="space-y-4">
               <Card>
@@ -482,29 +598,29 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
                   <CardDescription>Tickets currently assigned to you</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {assignedTickets.map((ticket) => (
+                  <div className="space-y-4 overflow-x-auto">
+                    {assignedTickets.length > 0 ? assignedTickets.map((ticket) => (
                       <div
                         key={ticket.id}
                         className={`border-l-4 p-4 rounded-r-lg ${getPriorityColor(ticket.priority)}`}
                       >
-                        <div className="flex items-start justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                           <div className="flex-1 cursor-pointer" onClick={() => handleTicketClick(ticket.id)}>
-                            <div className="flex items-center space-x-2 mb-2">
+                            <div className="flex items-center flex-wrap gap-2 mb-2">
                               {getStatusIcon(ticket.status)}
                               <span className="font-medium">{ticket.title}</span>
                               <Badge variant="outline" className="text-xs">
                                 {ticket.ticket_number || ticket.id}
                               </Badge>
                             </div>
-                            <p className="text-sm text-gray-600 mb-2">{ticket.description}</p>
-                            <div className="flex items-center space-x-4 text-sm text-gray-600">
+                            <p className="text-sm text-gray-600 mb-2 line-clamp-2">{ticket.description}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                               <span>Requester: {ticket.requester?.name || 'Unknown'}</span>
-                              <span>•</span>
+                              <span className="hidden sm:inline">•</span>
                               <span>{formatDate(ticket.created_at)}</span>
                             </div>
                           </div>
-                          <div className="flex flex-col space-y-2">
+                          <div className="flex flex-row sm:flex-col justify-between sm:justify-start gap-2">
                             <Badge 
                               variant="outline"
                               className={
@@ -544,7 +660,15 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
                           </div>
                         </div>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                        <MessageSquare className="h-12 w-12 text-gray-400 mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No assigned tickets</h3>
+                        <p className="text-gray-600">
+                          You don't have any tickets assigned to you yet.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -557,29 +681,30 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
                   <CardDescription>Unassigned tickets in your department</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-4 overflow-x-auto">
                     {departmentQueue.length > 0 ? (
                       departmentQueue.map((ticket) => (
                         <div
                           key={ticket.id}
                           className={`border-l-4 p-4 rounded-r-lg ${getPriorityColor(ticket.priority)}`}
                         >
-                          <div className="flex items-start justify-between">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                             <div className="flex-1 cursor-pointer" onClick={() => handleTicketClick(ticket.id)}>
-                              <div className="flex items-center space-x-2 mb-2">
+                              <div className="flex items-center flex-wrap gap-2 mb-2">
                                 {getStatusIcon(ticket.status)}
                                 <span className="font-medium">{ticket.title}</span>
                                 <Badge variant="outline" className="text-xs">
                                   {ticket.ticket_number || ticket.id}
                                 </Badge>
                               </div>
-                              <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
+                              <p className="text-sm text-gray-600 mb-2 line-clamp-2">{ticket.description || ''}</p>
+                              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                                 <span>Requester: {ticket.requester?.name || 'Unknown'}</span>
-                                <span>•</span>
+                                <span className="hidden sm:inline">•</span>
                                 <span>{formatDate(ticket.created_at)}</span>
                               </div>
                             </div>
-                            <div className="flex flex-col space-y-2">
+                            <div className="flex flex-row sm:flex-col justify-between sm:justify-start gap-2">
                               <Badge 
                                 variant="outline"
                                 className={
@@ -626,7 +751,7 @@ const SupportAgentDashboard: React.FC<SupportAgentDashboardProps> = ({ currentUs
                         <p className="text-gray-600 mb-2">
                           There are no unassigned tickets in your department. 
                         </p>
-                        <div className="bg-blue-50 p-3 rounded text-sm text-blue-800 mt-2 text-left">
+                        <div className="bg-blue-50 p-3 rounded text-sm text-blue-800 mt-2 text-left max-w-md mx-auto">
                           <p className="font-medium">Debug Info:</p>
                           <p>Department: {getDepartmentNameById(userDepartmentId || '')}</p>
                           <p>Department ID: {userDepartmentId || 'Not set'}</p>

@@ -22,12 +22,15 @@ import {
   AlertCircle,
   Calendar,
   Tag,
-  Sparkles
+  Sparkles,
+  History
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile } from '@/components/auth/AuthProvider';
 import { responseAgentService } from '@/lib/response-agent-service';
 import { toast } from "@/components/ui/use-toast";
+import { ticketResponseService, TicketResponse } from '@/lib/ticket-response-service';
+import TicketResponseHistory from './TicketResponseHistory';
 
 interface TicketDetailModalProps {
   ticketId: string | null;
@@ -77,6 +80,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   const [aiSuggestions, setAiSuggestions] = useState<AIResponse[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
   const [isGeneratingSmartReply, setIsGeneratingSmartReply] = useState(false);
+  const [ticketResponses, setTicketResponses] = useState<TicketResponse[]>([]);
+  const [isLoadingResponses, setIsLoadingResponses] = useState(false);
 
   // Mock AI response suggestions - In a real app, this would come from an AI service
   const generateAISuggestions = (ticketData: TicketDetails): AIResponse[] => {
@@ -123,13 +128,16 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
     return suggestions;
   };
 
-  // Fetch ticket details
+  // Fetch ticket details and responses
   useEffect(() => {
     const fetchTicketDetails = async () => {
       if (!ticketId || !isOpen) return;
       
       setIsLoading(true);
+      setIsLoadingResponses(true);
+      
       try {
+        // Fetch ticket details
         const { data, error } = await supabase
           .from('tickets')
           .select(`
@@ -161,10 +169,20 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
         const suggestions = generateAISuggestions(data);
         setAiSuggestions(suggestions);
         
+        // Fetch ticket responses
+        const { data: responses, error: responsesError } = await ticketResponseService.getResponsesByTicketId(ticketId);
+        
+        if (responsesError) {
+          console.error('Error fetching ticket responses:', responsesError);
+        } else {
+          setTicketResponses(responses);
+        }
+        
       } catch (error) {
         console.error('Error fetching ticket details:', error);
       } finally {
         setIsLoading(false);
+        setIsLoadingResponses(false);
       }
     };
 
@@ -176,8 +194,10 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
     
     setIsSubmitting(true);
     try {
+      const originalStatus = ticket.status;
+      
       // Update ticket status if changed
-      if (newStatus !== ticket.status) {
+      if (newStatus !== originalStatus) {
         const { error: statusError } = await supabase
           .from('tickets')
           .update({ 
@@ -192,14 +212,31 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
         }
       }
 
-      // Add response as a comment/note (you might need to create a ticket_responses table)
-      // For now, we'll just log it
-      console.log('Response submitted:', {
-        ticketId: ticket.id,
-        response,
-        internalNotes,
-        status: newStatus,
-        agentId: currentUser.id
+      // Store the response in the database
+      const { data: responseData, error: responseError } = await ticketResponseService.createResponse({
+        ticket_id: ticket.id,
+        response_text: response,
+        internal_notes: internalNotes,
+        status_before: originalStatus,
+        status_after: newStatus,
+        created_by: currentUser.id,
+        is_ai_generated: selectedSuggestion !== null
+      });
+
+      if (responseError) {
+        console.error('Error saving response:', responseError);
+        toast({
+          title: "Error",
+          description: "Failed to save your response. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Show success message
+      toast({
+        title: "Response Submitted",
+        description: "Your response has been saved successfully.",
       });
 
       // Reset form
@@ -215,6 +252,11 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
       
     } catch (error) {
       console.error('Error submitting response:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -307,6 +349,9 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
   if (!isOpen || !ticketId) return null;
 
+  // Check if ticket is closed to disable response functionality
+  const isTicketClosed = ticket?.status === 'closed';
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -378,7 +423,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                       </div>
                       <div>
                         <span className="font-medium">Assigned to:</span>
-                        <span className="ml-2">{ticket.assigned_agent?.name || 'Unassigned'}</span>
+                        <span className="ml-2">{ticket.assigned_agent?.name || ticket.department?.name}</span>
                       </div>
                       <div>
                         <span className="font-medium">Last Updated:</span>
@@ -393,17 +438,32 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                 </CardContent>
               </Card>
 
+              {/* Response History */}
+              <TicketResponseHistory 
+                responses={ticketResponses} 
+                isLoading={isLoadingResponses} 
+              />
+
               {/* Response Section */}
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle>Response</CardTitle>
-                      <CardDescription>Compose your response to the customer</CardDescription>
+                      <CardDescription>
+                        {isTicketClosed ? (
+                          <span className="flex items-center text-gray-500">
+                            <Archive className="h-4 w-4 mr-1" />
+                            This ticket is closed. Responses are disabled.
+                          </span>
+                        ) : (
+                          "Compose your response to the customer"
+                        )}
+                      </CardDescription>
                     </div>
                     <Button 
                       onClick={handleGenerateSmartReply} 
-                      disabled={isGeneratingSmartReply}
+                      disabled={isGeneratingSmartReply || isTicketClosed}
                       variant="outline"
                       className="flex items-center gap-2"
                     >
@@ -411,6 +471,11 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-600 border-t-transparent"></div>
                           Generating...
+                        </>
+                      ) : isTicketClosed ? (
+                        <>
+                          <Archive className="h-4 w-4 text-gray-600" />
+                          Ticket Closed
                         </>
                       ) : (
                         <>
@@ -423,17 +488,18 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Textarea
-                    placeholder="Type your response here..."
+                    placeholder={isTicketClosed ? "This ticket is closed. Responses are disabled." : "Type your response here..."}
                     value={response}
                     onChange={(e) => setResponse(e.target.value)}
                     rows={8}
                     className="resize-none"
+                    disabled={isTicketClosed}
                   />
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Update Status</label>
-                      <Select value={newStatus} onValueChange={setNewStatus}>
+                      <Select value={newStatus} onValueChange={setNewStatus} disabled={isTicketClosed}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -450,11 +516,12 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Internal Notes (Optional)</label>
                       <Textarea
-                        placeholder="Add internal notes..."
+                        placeholder={isTicketClosed ? "This ticket is closed. Notes are disabled." : "Add internal notes..."}
                         value={internalNotes}
                         onChange={(e) => setInternalNotes(e.target.value)}
                         rows={3}
                         className="resize-none"
+                        disabled={isTicketClosed}
                       />
                     </div>
                   </div>
@@ -465,10 +532,12 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                     </Button>
                     <Button 
                       onClick={handleSubmitResponse}
-                      disabled={!response.trim() || isSubmitting}
+                      disabled={!response.trim() || isSubmitting || isTicketClosed}
                     >
                       {isSubmitting ? (
                         'Submitting...'
+                      ) : isTicketClosed ? (
+                        'Ticket Closed'
                       ) : (
                         <>
                           <Send className="h-4 w-4 mr-2" />
@@ -547,6 +616,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                           variant="outline"
                           onClick={() => handleUseSuggestion(suggestion)}
                           className="flex-1"
+                          disabled={isTicketClosed}
                         >
                           <FileText className="h-3 w-3 mr-1" />
                           Use This
@@ -555,6 +625,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                           size="sm" 
                           variant="ghost"
                           onClick={() => copyToClipboard(suggestion.content)}
+                          disabled={isTicketClosed}
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
