@@ -1,103 +1,108 @@
-# Welcome to your Lovable project
+# Smart Ticket Flow Bot
 
-## Project info
+A modern help desk ticket management system with AI-powered features for efficient ticket handling and pattern detection.
 
-**URL**: https://lovable.dev/projects/643ed48a-baa5-4c3d-90a9-63866ed81eb0
+## Live Demo
 
-## How can I edit this code?
+The application is deployed and available at: [https://smart-ticket-flow-bot.onrender.com](https://smart-ticket-flow-bot.onrender.com)
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+- **AI-Powered Ticket Management**
+  - Smart ticket routing using AI
+  - Automated response generation
+  - Pattern detection for recurring issues
+  - Department-specific AI agents
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/643ed48a-baa5-4c3d-90a9-63866ed81eb0) and start prompting.
+- **Role-Based Access Control**
+  - Employee: Create and track personal tickets
+  - Support Agent: Handle department tickets
+  - Manager: Department oversight and analytics
+  - Super Admin: Full system control
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Department Management**
+  - IT Support
+  - HR
+  - Facilities
+  - Admin
 
-**Use your preferred IDE**
+- **Smart Features**
+  - AI-powered ticket responses
+  - Pattern detection for process improvement
+  - Knowledge base integration
+  - Real-time analytics
+  - Automated ticket routing
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Tech Stack
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Frontend**
+  - React + TypeScript
+  - Vite for build tooling
+  - Tailwind CSS for styling
+  - shadcn/ui for components
+  - React Router for navigation
 
-Follow these steps:
+- **Backend**
+  - Supabase for authentication and database
+  - OpenAI API for AI features
+  - Real-time updates
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Getting Started
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Prerequisites
 
-# Step 3: Install the necessary dependencies.
-npm i
+- Node.js (v16 or higher)
+- npm or yarn
+- Supabase account
+- OpenAI API key
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/smart-ticket-flow-bot.git
+cd smart-ticket-flow-bot
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Set up environment variables:
+Create a `.env` file in the root directory with:
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_OPENAI_API_KEY=your_openai_api_key
+```
+
+4. Start the development server:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Deployment
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The application is deployed on Render. To deploy your own instance:
 
-**Use GitHub Codespaces**
+1. Fork this repository
+2. Create a new Web Service on Render
+3. Connect your repository
+4. Set the following environment variables:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_OPENAI_API_KEY`
+5. Deploy!
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Contributing
 
-## What technologies are used for this project?
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-This project is built with:
+## License
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-- Supabase for authentication and database
-- OpenAI API for AI-powered pattern detection
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Environment Variables
+## Support
 
-For the application to work correctly, you need to set up the following environment variables in a `.env` file:
-
-```
-# Supabase Configuration
-VITE_SUPABASE_URL=your_supabase_url_here
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
-
-# OpenAI API Key for Pattern Detection
-VITE_OPENAI_API_KEY=your_openai_api_key_here
-```
-
-## Pattern Detection Feature
-
-The application includes an AI-powered pattern detection system that helps support agents identify:
-
-1. **Repetitive Work Patterns** - Identifies common issues that could benefit from automation or knowledge base articles
-2. **Misuse Patterns** - Detects potential security concerns or policy violations specific to each department
-
-This feature is accessible only to users with the 'support_agent' or 'manager' role, and analyzes tickets within their specific department.
-
-To use this feature:
-- Log in as a support agent
-- Click on "Open Pattern Detection" from the dashboard
-- Select the desired timeframe (7, 30, or 90 days)
-- Click "Run Analysis" to generate insights
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/643ed48a-baa5-4c3d-90a9-63866ed81eb0) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+For support, please open an issue in the GitHub repository or contact the development team.

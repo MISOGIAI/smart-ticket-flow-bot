@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: smart-ticket-flow-bot
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run preview
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_OPENAI_API_KEY
+        sync: false
+    healthCheckPath: /
+    autoDeploy: true 
